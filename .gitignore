@@ -1,0 +1,42 @@
+# Go build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+/bin/
+/build/
+/dist/
+.github
+
+# Go tooling
+*.cover
+coverage.out
+
+# Node.js / Next.js
+node_modules/
+.next/
+out/
+.vercel/
+
+# Env files
+.env
+.env.*
+
+# Logs
+*.log
+
+# OS files (Windows)
+Thumbs.db
+desktop.ini
+
+# Editor files
+.vscode/
+.idea/
+.DS_Store
+
+# Misc
+*.tmp
+*.swp
