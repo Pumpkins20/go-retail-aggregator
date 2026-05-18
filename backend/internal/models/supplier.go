@@ -27,7 +27,7 @@ type FetchResult struct {
 	Description  *string   `json:"description"`
 	Stock        int       `json:"stock"`
 	Status       string    `json:"status"`
-	LatencyMs    int       `json:"latency_ms"`
+	LatencyMs    int64     `json:"latency_ms"`
 	FetchedAt    time.Time `json:"fetched_at"`
 	ErrorMessage *string   `json:"error_message"`
 }
