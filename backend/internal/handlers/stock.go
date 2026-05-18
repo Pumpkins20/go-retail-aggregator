@@ -44,9 +44,9 @@ func StockHandler(w http.ResponseWriter, r *http.Request) {
 
 			select {
 			case <-ctx.Done():
-				ch <- models.Result{Resource: name, Stock: 0, Status: "Timeout"}
+				ch <- models.Result{SupplierName: name, Stock: 0, Status: "Timeout"}
 			case stock := <-resultCh:
-				ch <- models.Result{Resource: name, Stock: stock, Status: "Success"}
+				ch <- models.Result{SupplierName: name, Stock: stock, Status: "Success"}
 			}
 		}(name, service)
 	}
