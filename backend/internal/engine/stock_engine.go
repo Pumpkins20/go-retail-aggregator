@@ -41,7 +41,7 @@ func (e *StockEngine) FanOut(ctx context.Context, suppliers []models.Supplier) [
 			defer cancel()
 
 			f := e.fetcherFactory.GetFetcher()
-			result := f.Fetch(tCtx, sup)
+			results := f.Fetch(tCtx, sup)
 		}(supplier)
 	}
 
