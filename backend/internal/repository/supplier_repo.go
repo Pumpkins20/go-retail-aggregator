@@ -96,6 +96,18 @@ func (r *postgresSupplierRepository) Delete(ctx context.Context, id string) erro
 	return nil
 }
 
-
-
-
+func (r *postgresSupplierRepository) Create(ctx context.Context, req models.Supplier) error {
+	query := `
+		INSERT INTO suppliers (id, name, description, endpoint_url, auth_type, auth_token,
+				timeout_ms, is_active, mock_behavior, display_order, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+	`
+	_, err := r.db.Exec(ctx, query,
+		req.ID, req.Name, req.Description, req.EndpointURL, req.AuthType, req.AuthToken,
+		req.TimeoutMS, req.IsActive, req.MockBehavior, req.DisplayOrder, req.CreatedAt, req.UpdatedAt,
+	)	
+	if err != nil {
+		return fmt.Errorf("failed to create supplier: %w", err)
+	}
+	return nil
+}
