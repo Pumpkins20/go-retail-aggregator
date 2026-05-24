@@ -9,10 +9,10 @@ export interface BadgeProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 const variantClasses: Record<BadgeVariant, string> = {
-  default: "border-primary/20 bg-primary/15 text-primary",
-  secondary: "border-secondary/40 bg-secondary text-secondary-foreground",
-  outline: "border-border text-foreground",
-  destructive: "border-destructive/20 bg-destructive/10 text-destructive",
+  default: "border-primary/30 bg-primary/15 text-primary",
+  secondary: "border-secondary/30 bg-secondary/15 text-secondary-foreground",
+  outline: "border-border/70 text-foreground",
+  destructive: "border-destructive/30 bg-destructive/10 text-destructive",
 };
 
 function Badge({ className, variant = "default", ...props }: BadgeProps) {

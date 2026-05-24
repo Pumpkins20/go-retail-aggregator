@@ -13,8 +13,8 @@ export function Navbar() {
 
   return (
     <header className="sticky top-4 z-40 px-4 lg:hidden">
-      <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between rounded-xl border border-zinc-200 bg-white/95 px-4 shadow-sm backdrop-blur-sm">
-        <p className="text-sm font-semibold tracking-tight text-zinc-900">Retail Command Center</p>
+      <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between rounded-2xl border border-border/60 bg-card/80 px-4 shadow-soft backdrop-blur">
+        <p className="text-sm font-semibold tracking-tight text-foreground">Retail Command Center</p>
         <nav className="flex items-center gap-2" aria-label="Main Navigation">
           {navItems.map((item) => {
             const active = pathname === item.href;
@@ -22,10 +22,10 @@ export function Navbar() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`cursor-pointer rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors duration-200 focus-visible:outline-none ${
+                className={`cursor-pointer rounded-full px-3 py-1.5 text-xs font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                   active
-                    ? "bg-blue-600 text-white"
-                    : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
+                    ? "bg-primary text-primary-foreground shadow-soft"
+                    : "text-muted-foreground hover:bg-accent/70 hover:text-foreground"
                 }`}
               >
                 {item.label}

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Manrope, Playfair_Display } from "next/font/google";
+import { Nunito_Sans, Rubik } from "next/font/google";
 import { Toaster } from "sonner";
 
 import { Navbar } from "@/components/layout/Navbar";
@@ -7,14 +7,14 @@ import { Sidebar } from "@/components/layout/Sidebar";
 
 import "./global.css";
 
-const manrope = Manrope({
+const nunitoSans = Nunito_Sans({
   subsets: ["latin"],
-  variable: "--font-manrope",
+  variable: "--font-sans",
 });
 
-const playfair = Playfair_Display({
+const rubik = Rubik({
   subsets: ["latin"],
-  variable: "--font-playfair",
+  variable: "--font-serif",
 });
 
 export const metadata: Metadata = {
@@ -25,11 +25,11 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className={`${manrope.variable} ${playfair.variable} font-sans text-zinc-900 antialiased`}>
-        <div className="relative min-h-screen bg-zinc-50">
+      <body className={`${nunitoSans.variable} ${rubik.variable} font-sans antialiased`}>
+        <div className="relative min-h-screen">
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-x-0 top-0 h-56 bg-gradient-to-b from-blue-50 via-zinc-50 to-zinc-50"
+            className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-amber-100/60 via-transparent to-transparent"
           />
 
           <div className="relative min-h-screen lg:flex">
