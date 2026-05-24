@@ -2,6 +2,10 @@ package services
 
 import (
 	"errors"
+	"backend/internal/models"
+	"backend/internal/repository"
+	"context"
+	"strings"
 )
 
 var (
@@ -49,4 +53,45 @@ func (s *SupplierService) DeleteSupplier(ctx context.Context, id string) error {
 		}
 	}
 	return s.repo.Delete(ctx, id)
+}
+
+// edit supplier details (except ID) and toggle active status
+func (s *SupplierService) UpdateSupplier(ctx context.Context, id string, req models.Supplier) error {
+
+	oldSupplier, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	if strings.ToLower(req.Name) != strings.ToLower(oldSupplier.Name) {
+		exist, err := s.repo.ExistsbyName(ctx, strings.ToLower(req.Name))
+		if err != nil {
+			return err
+		}
+		if exist {
+			return ErrSupplierNameExists
+		}
+	}
+
+	req.ID = oldSupplier.ID
+	return s.repo.Update(ctx, req)
+}
+
+func (s *SupplierService) ToggleActiveStatus(ctx context.Context, id string, isActive bool) error {
+	supplier, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	if supplier.IsActive {
+		activeCount, err := s.repo.CountActiveSuppliers(ctx)
+		if err != nil {
+			return err
+		}
+		if activeCount <= 1 {
+			return ErrLastActiveSupplier
+		}
+	}
+
+	return s.repo.ToggleActiveStatus(ctx, id, !supplier.IsActive)
 }

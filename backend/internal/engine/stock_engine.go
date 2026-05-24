@@ -27,7 +27,7 @@ func (e *StockEngine) FanOut(ctx context.Context, suppliers []models.Supplier) [
 	sem := make(chan struct{}, 50)
 
 	// buffered channel to collect results
-	results := make([]models.FetchResult, len(suppliers))
+	results := make(chan models.FetchResult, len(suppliers))
 
 	// fan out fetches
 	for _, supplier := range suppliers {
@@ -41,7 +41,7 @@ func (e *StockEngine) FanOut(ctx context.Context, suppliers []models.Supplier) [
 			defer cancel()
 
 			f := e.fetcherFactory.GetFetcher()
-			results := f.Fetch(tCtx, sup)
+			results <- f.Fetch(tCtx, sup)
 		}(supplier)
 	}
 

@@ -24,7 +24,5 @@ func (f *FetcherFactory) GetFetcher() SupplierFetcher {
 		return &MockFetcher{}
 	}
 
-	return &HTTPFetcher{
-		Client: &http.DefaultClient{},
-	}
+	return &HttpFetcher{client: http.DefaultClient}
 }

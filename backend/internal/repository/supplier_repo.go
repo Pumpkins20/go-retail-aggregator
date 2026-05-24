@@ -3,22 +3,34 @@ package repository
 import (
 	"backend/internal/models"
 	"context"
-	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"fmt"
 )
 
+type SupplierRepository interface {
+	GetActiveSuppliers(ctx context.Context) ([]models.Supplier, error)
+	ExistsbyName(ctx context.Context, name string) (bool, error)
+	CountActiveSuppliers(ctx context.Context) (int, error)
+	GetByID(ctx context.Context, id string) (models.Supplier, error)
+	Delete(ctx context.Context, id string) error
+	Create(ctx context.Context, req models.Supplier) error
+	Update(ctx context.Context, req models.Supplier) error
+	ToggleActiveStatus(ctx context.Context, id string, isActive bool) error
+}
+
 var _ SupplierRepository = (*postgresSupplierRepository)(nil)
+
 
 type postgresSupplierRepository struct {
 	db *pgxpool.Pool
 }
 
-func NewSupplierRepository(db *pgxpool.Pool) *SupplierRepository {
+func NewSupplierRepository(db *pgxpool.Pool) SupplierRepository {
 	return &postgresSupplierRepository{db: db}
 }
 
 
-func (r *postgresSupplierRepository) Create(ctx context.Context) ([]models.Supplier, error) {
+func (r *postgresSupplierRepository) GetActiveSuppliers(ctx context.Context) ([]models.Supplier, error) {
 	query := `
 		SELECT id, name, description, endpoint_url, auth_type, auth_token,
 				timeout_ms, is_active, mock_behavior, display_order, created_at, updated_at
@@ -37,7 +49,7 @@ func (r *postgresSupplierRepository) Create(ctx context.Context) ([]models.Suppl
 		var s models.Supplier
 		if err := rows.Scan(
 			&s.ID, &s.Name, &s.Description, &s.EndpointURL, &s.AuthType, &s.AuthToken,
-			&s.TimeoutMS, &s.IsActive, &s.MockBehavior, &s.DisplayOrder, &s.CreatedAt, &s.UpdatedAt,
+			&s.TimeoutMs, &s.IsActive, &s.MockBehavior, &s.DisplayOrder, &s.CreatedAt, &s.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan supplier: %w", err)
 		}
@@ -69,7 +81,7 @@ func (r *postgresSupplierRepository) CountActiveSuppliers(ctx context.Context) (
 }
 
 // Get supplier by ID and delete supplier by ID
-func (r *postgresSupplierRepository) GetByID(ctx context.Context, id string) (*models.Supplier, error) {
+func (r *postgresSupplierRepository) GetByID(ctx context.Context, id string) (models.Supplier, error) {
 	query := `
 		SELECT id, name, description, endpoint_url, auth_type, auth_token,
 				timeout_ms, is_active, mock_behavior, display_order, created_at, updated_at
@@ -79,12 +91,12 @@ func (r *postgresSupplierRepository) GetByID(ctx context.Context, id string) (*m
 	var s models.Supplier
 	err := r.db.QueryRow(ctx, query, id).Scan(
 		&s.ID, &s.Name, &s.Description, &s.EndpointURL, &s.AuthType, &s.AuthToken,
-		&s.TimeoutMS, &s.IsActive, &s.MockBehavior, &s.DisplayOrder, &s.CreatedAt, &s.UpdatedAt,
+		&s.TimeoutMs, &s.IsActive, &s.MockBehavior, &s.DisplayOrder, &s.CreatedAt, &s.UpdatedAt,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get supplier by ID: %w", err)
+		return models.Supplier{}, fmt.Errorf("failed to get supplier by ID: %w", err)
 	}
-	return &s, nil
+	return s, nil
 }
 
 func (r *postgresSupplierRepository) Delete(ctx context.Context, id string) error {
@@ -98,16 +110,42 @@ func (r *postgresSupplierRepository) Delete(ctx context.Context, id string) erro
 
 func (r *postgresSupplierRepository) Create(ctx context.Context, req models.Supplier) error {
 	query := `
-		INSERT INTO suppliers (id, name, description, endpoint_url, auth_type, auth_token,
-				timeout_ms, is_active, mock_behavior, display_order, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		INSERT INTO suppliers (name, description, endpoint_url, auth_type, auth_token,
+				timeout_ms,is_active, mock_behavior, display_order)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 	`
 	_, err := r.db.Exec(ctx, query,
 		req.ID, req.Name, req.Description, req.EndpointURL, req.AuthType, req.AuthToken,
-		req.TimeoutMS, req.IsActive, req.MockBehavior, req.DisplayOrder, req.CreatedAt, req.UpdatedAt,
+		req.TimeoutMs, req.IsActive, req.MockBehavior, req.DisplayOrder, req.CreatedAt, req.UpdatedAt,
 	)	
 	if err != nil {
 		return fmt.Errorf("failed to create supplier: %w", err)
+	}
+	return nil
+}
+
+func (r *postgresSupplierRepository) Update(ctx context.Context, req models.Supplier) error {
+	query := `
+		UPDATE suppliers
+		SET name = $1, description = $2, endpoint_url = $3, auth_type = $4, auth_token = $5,
+			timeout_ms = $6, mock_behavior = $7, display_order = $8
+		WHERE id = $9
+	`
+	_, err := r.db.Exec(ctx, query,
+		req.Name, req.Description, req.EndpointURL, req.AuthType, req.AuthToken,
+		req.TimeoutMs, req.MockBehavior, req.DisplayOrder, req.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update supplier: %w", err)
+	}
+	return nil
+}
+
+func (r *postgresSupplierRepository) ToggleActiveStatus(ctx context.Context, id string, isActive bool) error {
+	query := `UPDATE suppliers SET is_active = $1 WHERE id = $2`
+	_, err := r.db.Exec(ctx, query, isActive, id)
+	if err != nil {
+		return fmt.Errorf("failed to toggle supplier active status: %w", err)
 	}
 	return nil
 }

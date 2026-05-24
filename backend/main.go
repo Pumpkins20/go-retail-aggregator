@@ -2,16 +2,104 @@ package main
 
 import (
 	"backend/internal/handlers"
+	"backend/internal/repository"
+	"backend/internal/services"
+	"backend/internal/engine"
+	"backend/internal/db"
+	"backend/internal/fetcher"
+	"backend/internal/middleware"
+	"backend/internal/config"
+
+	"context"
+	"os"
+	"log"
+	"os/signal"
+	"syscall"
+	"time"
 	"fmt"
 	"net/http"
 )
 
 func main() {
-	fmt.Println("Starting server on :8080")
+	fmt.Println("Starting Go Retail Aggregator...")
 
-	http.HandleFunc("/stock", handlers.StockHandler)
-	err := http.ListenAndServe(":8080", nil)
+	// Load configuration
+	cfg := config.LoadConfig()
+
+	fmt.Printf ("database URL: %s\n", cfg.DatabaseURL)
+
+	// initialize database connection
+	pool, err := db.InitDB(cfg.DatabaseURL)
 	if err != nil {
-		fmt.Println("Error starting server:", err)
+		log.Fatalf("Failed to connect to database: %v", err)
 	}
+	defer pool.Close()
+
+	// initialize dependencies
+	// initialize repositories
+	supplierRepo := repository.NewSupplierRepository(pool)
+
+	// initialize engines and fetchers
+	fetcherFactory := fetcher.NewFetcherFactory(cfg.FetcherMode)
+	stockEngine := engine.NewStockEngine(fetcherFactory)
+
+	// initialize services
+	supplierService := services.NewSupplierService(supplierRepo)
+	stockService := services.NewStockService(supplierRepo, stockEngine)
+
+	// initialize handlers
+	supplierHandler := handlers.NewSupplierHandler(supplierService)
+	stockHandler := handlers.NewStockHandler(stockService)
+
+
+	// setup HTTP server and routes
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("POST /api/v1/suppliers", supplierHandler.Create)
+	mux.HandleFunc("DELETE /api/v1/suppliers", supplierHandler.Delete)
+	mux.HandleFunc("GET /api/v1/stock", stockHandler.GetStock)
+
+	// API Health Check
+	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status":"ok", "version":"1.0.0"}`))
+	})
+
+	// middleware for logging and CORS can be added here
+	var handler http.Handler = mux
+	handler = middleware.Logger(handler)
+	handler = middleware.CORS(handler)
+	handler = middleware.RequestID(handler)
+
+	// Setup server with middleware (CORS)
+	server := &http.Server{
+		Addr:    ":" + cfg.Port,
+		Handler: handler,
+	}
+
+	// run server in a goroutine so don't block on downstream code
+	go func() {
+		fmt.Printf("Server is running on http://localhost%s\n", server.Addr)
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Failed to start server: %v", err)
+		}
+	}()
+
+	// Graceful shutdown on SIGINT or SIGTERM
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	<-quit
+
+	fmt.Println("Shutting down server...")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := server.Shutdown(ctx); err != nil {
+		log.Fatalf("Failed to shutdown server: %v", err)
+	}
+	fmt.Println("Server gracefully stopped")
 }
+
+
+
+

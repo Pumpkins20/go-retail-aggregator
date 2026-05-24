@@ -1,61 +1,30 @@
 package handlers
 
 import (
-	"context"
+	"fmt"
 	"encoding/json"
 	"net/http"
-	"time"
 
-	"backend/internal/models"
 	"backend/internal/services"
 )
 
-func StockHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origins", "*")
+type StockHandler struct {
+	service *services.StockService
+}
+
+func NewStockHandler(service *services.StockService) *StockHandler {
+	return &StockHandler{service: service}
+}
+
+func (h *StockHandler) GetStock(w http.ResponseWriter, r *http.Request) {
+	resp, err := h.service.GetAggregatedStock(r.Context())
+	if err != nil {
+		fmt.Printf("Error fetching stock data: %v\n", err)
+		WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to fetch stock data")
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-
-	suppliers := map[string]services.Storer{
-		"MySQL": &services.MySQLService{},
-		"Tokopedia": &services.HTTAPIService{
-			URL:  "https://api.tokopedia.com/stock",
-			Name: "Tokopedia API",
-		},
-		"Shopee": &services.HTTAPIService{
-			URL:  "https://api.shopee.com/stock",
-			Name: "Shopee API",
-		},
-		"Lazada": &services.HTTAPIService{
-			URL:  "https://api.lazada.com/stock",
-			Name: "Lazada API",
-		},
-	}
-
-	ch := make(chan models.Result)
-
-	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
-	defer cancel()
-
-	for name, service := range suppliers {
-		go func(name string, service services.Storer) {
-			resultCh := make(chan int, 1)
-			go func() {
-				resultCh <- service.GetStock(1)
-			}()
-
-			select {
-			case <-ctx.Done():
-				ch <- models.Result{SupplierName: name, Stock: 0, Status: "Timeout"}
-			case stock := <-resultCh:
-				ch <- models.Result{SupplierName: name, Stock: stock, Status: "Success"}
-			}
-		}(name, service)
-	}
-
-	var results []models.Result
-
-	for i := 0; i < len(suppliers); i++ {
-		results = append(results, <-ch)
-	}
-
-	json.NewEncoder(w).Encode(results)
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
 }

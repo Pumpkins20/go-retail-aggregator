@@ -20,8 +20,8 @@ func NewSupplierHandler(service *services.SupplierService) *SupplierHandler {
 func WriteError (w http.ResponseWriter, statusCode int,code string, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(map[string]string{
-		"error" : map[string]interface{}{
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"error" : map[string]string{
 			"code": code,
 			"message": message,
 		},
@@ -49,7 +49,7 @@ func (h *SupplierHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{
+	json.NewEncoder(w).Encode(map[string]interface{}{
 		"message": "Supplier created successfully",
 	})
 }
