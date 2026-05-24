@@ -1,112 +1,33 @@
-@import url("https://fonts.googleapis.com/css2?family=Fraunces:wght@400;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap");
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-	--font-sans: "Space Grotesk", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-	--font-serif: "Fraunces", "Iowan Old Style", "Times New Roman", serif;
-
-	--background: 36 45% 98%;
-	--foreground: 215 28% 17%;
-	--card: 0 0% 100%;
-	--card-foreground: 215 28% 17%;
-	--popover: 0 0% 100%;
-	--popover-foreground: 215 28% 17%;
-	--primary: 187 62% 32%;
-	--primary-foreground: 0 0% 98%;
-	--secondary: 33 75% 88%;
-	--secondary-foreground: 215 28% 17%;
-	--muted: 35 40% 92%;
-	--muted-foreground: 215 16% 40%;
-	--accent: 168 52% 84%;
-	--accent-foreground: 215 28% 17%;
-	--destructive: 0 72% 56%;
-	--destructive-foreground: 0 0% 98%;
-	--border: 30 20% 86%;
-	--input: 30 20% 86%;
-	--ring: 187 62% 32%;
-	--radius: 14px;
+  --background: #fafafa;
+  --foreground: #18181b;
 }
 
-.dark {
-	--background: 215 28% 10%;
-	--foreground: 36 45% 96%;
-	--card: 215 28% 12%;
-	--card-foreground: 36 45% 96%;
-	--popover: 215 28% 12%;
-	--popover-foreground: 36 45% 96%;
-	--primary: 176 60% 45%;
-	--primary-foreground: 215 30% 12%;
-	--secondary: 215 22% 18%;
-	--secondary-foreground: 36 45% 96%;
-	--muted: 215 20% 16%;
-	--muted-foreground: 215 12% 68%;
-	--accent: 190 40% 20%;
-	--accent-foreground: 36 45% 96%;
-	--destructive: 0 62% 40%;
-	--destructive-foreground: 0 0% 98%;
-	--border: 215 18% 22%;
-	--input: 215 18% 22%;
-	--ring: 176 60% 45%;
+* {
+  box-sizing: border-box;
 }
 
-@layer base {
-	* {
-		border-color: hsl(var(--border));
-	}
-
-	html {
-		scroll-behavior: smooth;
-	}
-
-	body {
-		min-height: 100vh;
-		background-color: hsl(var(--background));
-		color: hsl(var(--foreground));
-		font-family: var(--font-sans);
-		-webkit-font-smoothing: antialiased;
-		-moz-osx-font-smoothing: grayscale;
-		background-image:
-			repeating-linear-gradient(
-				90deg,
-				hsl(var(--foreground) / 0.04) 0,
-				hsl(var(--foreground) / 0.04) 1px,
-				transparent 1px,
-				transparent 32px
-			),
-			radial-gradient(1200px 700px at 12% -10%, hsl(var(--accent) / 0.28), transparent 60%),
-			radial-gradient(900px 600px at 88% -5%, hsl(var(--secondary) / 0.35), transparent 62%),
-			linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--muted)) 100%);
-		background-attachment: fixed;
-	}
-
-	h1,
-	h2,
-	h3 {
-		font-family: var(--font-serif);
-		letter-spacing: -0.02em;
-	}
-
-	a {
-		color: hsl(var(--foreground));
-		text-decoration: underline;
-		text-decoration-color: hsl(var(--primary) / 0.4);
-		text-underline-offset: 4px;
-	}
+html,
+body {
+  min-height: 100%;
 }
 
-@layer utilities {
-	.text-balance {
-		text-wrap: balance;
-	}
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-manrope), sans-serif;
+}
 
-	.surface-card {
-		background-color: hsl(var(--card) / 0.8);
-		backdrop-filter: blur(12px);
-		-webkit-backdrop-filter: blur(12px);
-		border: 1px solid hsl(var(--border) / 0.6);
-		box-shadow: 0 12px 30px -20px hsl(var(--foreground) / 0.35);
-	}
+.font-serif {
+  font-family: var(--font-playfair), serif;
+}
+
+:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
 }

@@ -1,0 +1,108 @@
+import type {
+  CreateSupplierResponse,
+  ErrorResponse,
+  StockResponse,
+  Supplier,
+} from "@/types";
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+
+export class ApiClientError extends Error {
+  code: string;
+  status: number;
+
+  constructor(message: string, code = "UNKNOWN_ERROR", status = 500) {
+    super(message);
+    this.name = "ApiClientError";
+    this.code = code;
+    this.status = status;
+  }
+}
+
+function isErrorResponse(payload: unknown): payload is ErrorResponse {
+  if (!payload || typeof payload !== "object") return false;
+
+  const maybeError = (payload as { error?: unknown }).error;
+  if (!maybeError || typeof maybeError !== "object") return false;
+
+  const { code, message } = maybeError as { code?: unknown; message?: unknown };
+  return typeof code === "string" && typeof message === "string";
+}
+
+function safeJsonParse(text: string): unknown {
+  if (!text) return null;
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  if (!API_BASE_URL) {
+    throw new ApiClientError(
+      "NEXT_PUBLIC_API_URL is not configured.",
+      "CONFIG_ERROR",
+      500,
+    );
+  }
+
+  let response: Response;
+
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        ...(init?.headers ?? {}),
+      },
+      cache: "no-store",
+    });
+  } catch {
+    throw new ApiClientError(
+      "Cannot connect to API server. Please check backend availability.",
+      "NETWORK_ERROR",
+      0,
+    );
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  const text = await response.text();
+  const payload = safeJsonParse(text);
+
+  if (!response.ok) {
+    if (isErrorResponse(payload)) {
+      throw new ApiClientError(payload.error.message, payload.error.code, response.status);
+    }
+
+    throw new ApiClientError(
+      `Request failed with status ${response.status}`,
+      "HTTP_ERROR",
+      response.status,
+    );
+  }
+
+  return payload as T;
+}
+
+export function getStock(): Promise<StockResponse> {
+  return request<StockResponse>("/stock", { method: "GET" });
+}
+
+export function createSupplier(payload: Supplier): Promise<CreateSupplierResponse> {
+  return request<CreateSupplierResponse>("/suppliers", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteSupplier(id: string): Promise<void> {
+  const query = new URLSearchParams({ id });
+  return request<void>(`/suppliers?${query.toString()}`, {
+    method: "DELETE",
+  });
+}
