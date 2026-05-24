@@ -3,29 +3,29 @@
 @tailwind utilities;
 
 :root {
-  --font-sans: "Nunito Sans", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-  --font-serif: "Rubik", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-sans: "Manrope", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-serif: "Playfair Display", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
 
-  --background: 60 9% 98%;
-  --foreground: 20 14% 4%;
-  --card: 60 9% 99%;
-  --card-foreground: 20 14% 4%;
-  --popover: 60 9% 99%;
-  --popover-foreground: 20 14% 4%;
-  --primary: 41 96% 40%;
-  --primary-foreground: 60 9% 98%;
-  --secondary: 30 6% 25%;
-  --secondary-foreground: 60 9% 98%;
-  --muted: 60 9% 94%;
-  --muted-foreground: 30 6% 35%;
-  --accent: 41 96% 88%;
-  --accent-foreground: 30 6% 20%;
-  --destructive: 0 72% 50%;
-  --destructive-foreground: 60 9% 98%;
-  --border: 30 8% 85%;
-  --input: 30 8% 85%;
-  --ring: 41 96% 40%;
-  --radius: 18px;
+  --background: 0 0% 98%;
+  --foreground: 240 6% 10%;
+  --card: 0 0% 100%;
+  --card-foreground: 240 6% 10%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 240 6% 10%;
+  --primary: 221 83% 53%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 240 5% 96%;
+  --secondary-foreground: 240 6% 10%;
+  --muted: 240 5% 96%;
+  --muted-foreground: 240 4% 46%;
+  --accent: 214 95% 93%;
+  --accent-foreground: 226 71% 40%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 240 6% 90%;
+  --input: 240 6% 90%;
+  --ring: 221 83% 53%;
+  --radius: 12px;
 }
 
 *,
@@ -44,39 +44,10 @@ body {
   margin: 0;
   min-height: 100%;
   background-color: hsl(var(--background));
-  background-image:
-    radial-gradient(circle at 12% 8%, hsl(var(--accent) / 0.5), transparent 52%),
-    radial-gradient(circle at 88% 18%, hsl(var(--primary) / 0.25), transparent 48%),
-    linear-gradient(140deg, hsl(var(--background)) 0%, hsl(var(--muted)) 100%);
   color: hsl(var(--foreground));
   font-family: var(--font-sans);
   line-height: 1.6;
-  position: relative;
   overflow-x: hidden;
-}
-
-body::before,
-body::after {
-  content: "";
-  position: fixed;
-  pointer-events: none;
-  z-index: -1;
-}
-
-body::before {
-  inset: -20% -10% auto auto;
-  width: 40rem;
-  height: 40rem;
-  background: radial-gradient(circle, hsl(var(--primary) / 0.22), transparent 60%);
-  filter: blur(10px);
-}
-
-body::after {
-  inset: auto auto -25% -15%;
-  width: 48rem;
-  height: 48rem;
-  background: radial-gradient(circle, hsl(var(--accent) / 0.6), transparent 62%);
-  filter: blur(12px);
 }
 
 h1,

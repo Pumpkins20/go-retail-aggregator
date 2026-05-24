@@ -46,8 +46,8 @@ const config = {
 				sm: "calc(var(--radius) - 4px)",
 			},
 			fontFamily: {
-				sans: ["var(--font-sans)", "ui-sans-serif", "system-ui", "sans-serif"],
-				serif: ["var(--font-serif)", "ui-serif", "Georgia", "serif"],
+				sans: ['var(--font-manrope)', 'sans-serif'],
+				serif: ['var(--font-playfair)', 'serif'],
 			},
 			boxShadow: {
 				soft: "0 12px 30px -20px hsl(var(--foreground) / 0.35)",

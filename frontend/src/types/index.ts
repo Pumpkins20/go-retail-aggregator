@@ -13,6 +13,8 @@ export interface Supplier {
   updated_at: string;
 }
 
+export type SupplierPayload = Omit<Supplier, "id" | "created_at" | "updated_at">;
+
 export interface FetchResult {
   supplier_id: string;
   supplier_name: string;
@@ -44,4 +46,16 @@ export interface ErrorResponse {
 
 export interface CreateSupplierResponse {
   message: string;
+}
+
+export interface Pagination {
+  page: number;
+  limit: number;
+  total: number;
+  total_pages: number;
+}
+
+export interface SupplierListResponse {
+  data: Supplier[];
+  pagination?: Pagination;
 }

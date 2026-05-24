@@ -21,6 +21,10 @@ func NewSupplierService(repo repository.SupplierRepository) *SupplierService {
 	return &SupplierService{repo: repo}
 }
 
+func (s *SupplierService) ListSuppliers(ctx context.Context) ([]models.Supplier, error) {
+	return s.repo.GetAllSuppliers(ctx)
+}
+
 // Rule 1: Supplier names must be unique (case-insensitive)
 func (s *SupplierService) CreateSupplier(ctx context.Context, req models.Supplier) error {
 	// change name to lower case for case-insensitive comparison

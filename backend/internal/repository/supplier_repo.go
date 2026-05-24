@@ -8,6 +8,7 @@ import (
 )
 
 type SupplierRepository interface {
+	GetAllSuppliers(ctx context.Context) ([]models.Supplier, error)
 	GetActiveSuppliers(ctx context.Context) ([]models.Supplier, error)
 	ExistsbyName(ctx context.Context, name string) (bool, error)
 	CountActiveSuppliers(ctx context.Context) (int, error)
@@ -37,6 +38,33 @@ func (r *postgresSupplierRepository) GetActiveSuppliers(ctx context.Context) ([]
 		FROM suppliers
 		WHERE is_active = true
 		ORDER BY display_order ASC
+	`
+	rows, err := r.db.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query suppliers: %w", err)
+	}
+	defer rows.Close()
+
+	var suppliers []models.Supplier
+	for rows.Next() {
+		var s models.Supplier
+		if err := rows.Scan(
+			&s.ID, &s.Name, &s.Description, &s.EndpointURL, &s.AuthType, &s.AuthToken,
+			&s.TimeoutMs, &s.IsActive, &s.MockBehavior, &s.DisplayOrder, &s.CreatedAt, &s.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan supplier: %w", err)
+		}
+		suppliers = append(suppliers, s)
+	}
+	return suppliers, nil
+}
+
+func (r *postgresSupplierRepository) GetAllSuppliers(ctx context.Context) ([]models.Supplier, error) {
+	query := `
+		SELECT id, name, description, endpoint_url, auth_type, auth_token,
+				timeout_ms, is_active, mock_behavior, display_order, created_at, updated_at
+		FROM suppliers
+		ORDER BY display_order ASC, created_at ASC
 	`
 	rows, err := r.db.Query(ctx, query)
 	if err != nil {
@@ -115,9 +143,9 @@ func (r *postgresSupplierRepository) Create(ctx context.Context, req models.Supp
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 	`
 	_, err := r.db.Exec(ctx, query,
-		req.ID, req.Name, req.Description, req.EndpointURL, req.AuthType, req.AuthToken,
-		req.TimeoutMs, req.IsActive, req.MockBehavior, req.DisplayOrder, req.CreatedAt, req.UpdatedAt,
-	)	
+		req.Name, req.Description, req.EndpointURL, req.AuthType, req.AuthToken,
+		req.TimeoutMs, req.IsActive, req.MockBehavior, req.DisplayOrder,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to create supplier: %w", err)
 	}

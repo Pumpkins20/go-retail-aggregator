@@ -3,6 +3,8 @@ import type {
   ErrorResponse,
   StockResponse,
   Supplier,
+  SupplierPayload,
+  SupplierListResponse,
 } from "@/types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -93,9 +95,36 @@ export function getStock(): Promise<StockResponse> {
   return request<StockResponse>("/stock", { method: "GET" });
 }
 
-export function createSupplier(payload: Supplier): Promise<CreateSupplierResponse> {
+function unwrapSupplierList(payload: unknown): Supplier[] {
+  if (Array.isArray(payload)) {
+    return payload as Supplier[];
+  }
+
+  if (payload && typeof payload === "object") {
+    const maybeData = (payload as SupplierListResponse).data;
+    if (Array.isArray(maybeData)) {
+      return maybeData as Supplier[];
+    }
+  }
+
+  return [];
+}
+
+export async function getSuppliers(): Promise<Supplier[]> {
+  const payload = await request<unknown>("/suppliers", { method: "GET" });
+  return unwrapSupplierList(payload);
+}
+
+export function createSupplier(payload: SupplierPayload): Promise<CreateSupplierResponse> {
   return request<CreateSupplierResponse>("/suppliers", {
     method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateSupplier(id: string, payload: SupplierPayload): Promise<CreateSupplierResponse> {
+  return request<CreateSupplierResponse>(`/suppliers/${id}`, {
+    method: "PUT",
     body: JSON.stringify(payload),
   });
 }
@@ -104,5 +133,11 @@ export function deleteSupplier(id: string): Promise<void> {
   const query = new URLSearchParams({ id });
   return request<void>(`/suppliers?${query.toString()}`, {
     method: "DELETE",
+  });
+}
+
+export function toggleSupplier(id: string): Promise<void> {
+  return request<void>(`/suppliers/${id}/toggle`, {
+    method: "PATCH",
   });
 }

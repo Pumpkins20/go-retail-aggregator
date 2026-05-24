@@ -55,8 +55,11 @@ func main() {
 	// setup HTTP server and routes
 	mux := http.NewServeMux()
 
+	mux.HandleFunc("GET /api/v1/suppliers", supplierHandler.List)
 	mux.HandleFunc("POST /api/v1/suppliers", supplierHandler.Create)
+	mux.HandleFunc("PUT /api/v1/suppliers/{id}", supplierHandler.Update)
 	mux.HandleFunc("DELETE /api/v1/suppliers", supplierHandler.Delete)
+	mux.HandleFunc("PATCH /api/v1/suppliers/{id}/toggle", supplierHandler.Toggle)
 	mux.HandleFunc("GET /api/v1/stock", stockHandler.GetStock)
 
 	// API Health Check
