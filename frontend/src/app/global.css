@@ -1,29 +1,61 @@
 @import "tailwindcss";
 
 :root {
-  --font-sans: "Manrope", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-  --font-serif: "Playfair Display", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  /* Font families mapped from system-ui/Next fonts */
+  --font-sans: "Manrope", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-serif: "Playfair Display", Georgia, Cambria, "Times New Roman", Times, serif;
 
-  --background: 0 0% 98%;
-  --foreground: 240 6% 10%;
-  --card: 0 0% 100%;
-  --card-foreground: 240 6% 10%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 240 6% 10%;
-  --primary: 221 83% 53%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 240 5% 96%;
-  --secondary-foreground: 240 6% 10%;
-  --muted: 240 5% 96%;
-  --muted-foreground: 240 4% 46%;
-  --accent: 214 95% 93%;
-  --accent-foreground: 226 71% 40%;
-  --destructive: 0 72% 51%;
+  /* Standard shadcn UI variables (converted to HSL syntax to preserve compatibility) */
+  --background: 0 0% 98%;      /* #FAFAFA - Page background */
+  --foreground: 240 5.9% 10%;  /* #18181B - zinc-900 */
+  
+  --card: 0 0% 100%;           /* #FFFFFF - Card surface */
+  --card-foreground: 240 5.9% 10%; /* #18181B */
+  
+  --popover: 0 0% 100%;        /* #FFFFFF */
+  --popover-foreground: 240 5.9% 10%;
+  
+  --primary: 240 5.9% 10%;     /* #18181B - zinc-900 (Hitam untuk primary CTA) */
+  --primary-foreground: 0 0% 98%; /* #FAFAFA - zinc-50 */
+  
+  --secondary: 240 4.8% 95.9%; /* #F4F4F5 - zinc-100 */
+  --secondary-foreground: 240 5.9% 10%;
+  
+  --muted: 240 4.8% 95.9%;     /* #F4F4F5 - zinc-100 */
+  --muted-foreground: 240 3.8% 46.1%; /* #71717A - zinc-500 */
+  
+  --accent: 240 4.8% 95.9%;    /* #F4F4F5 - zinc-100 (for standard hover states) */
+  --accent-foreground: 240 5.9% 10%; /* #18181B */
+  
+  --destructive: 0 72.2% 50.6%; /* #DC2626 - red-600 */
   --destructive-foreground: 0 0% 100%;
-  --border: 240 6% 90%;
-  --input: 240 6% 90%;
-  --ring: 221 83% 53%;
-  --radius: 12px;
+  
+  --border: 240 5.9% 90%;      /* #E4E4E7 - zinc-200 */
+  --input: 240 5.9% 90%;       /* #E4E4E7 - zinc-200 */
+  --ring: 240 5.9% 10%;        /* #18181B - zinc-900 */
+  --radius: 8px;
+}
+
+/* Tailwind Theme variables configuration (Tailwind v4 theme extensions) */
+@theme {
+  --color-accent-blue: #2563EB;
+  --color-accent-light: #EFF6FF;
+  --color-accent-muted: #DBEAFE;
+
+  --color-success-main: #16A34A;
+  --color-success-bg: #F0FDF4;
+  --color-success-border: #BBF7D0;
+
+  --color-warning-main: #D97706;
+  --color-warning-bg: #FFFBEB;
+  --color-warning-border: #FDE68A;
+
+  --color-error-main: #DC2626;
+  --color-error-bg: #FEF2F2;
+  --color-error-border: #FECACA;
+
+  --font-display: var(--font-serif);
+  --font-body: var(--font-sans);
 }
 
 *,
@@ -44,32 +76,43 @@ body {
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
   font-family: var(--font-sans);
-  line-height: 1.6;
+  line-height: 1.5;
   overflow-x: hidden;
 }
 
+/* Typography elements mapping display/body fonts */
 h1,
-h2,
-h3 {
+h2 {
   font-family: var(--font-serif);
   letter-spacing: -0.02em;
 }
 
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-sans);
+}
+
 a {
   color: hsl(var(--foreground));
-  text-decoration: underline;
-  text-decoration-color: hsl(var(--primary) / 0.5);
-  text-underline-offset: 4px;
+  text-decoration: none;
+  transition: color var(--duration-fast, 150ms) ease;
 }
 
 ::selection {
-  background: hsl(var(--primary) / 0.25);
-  color: hsl(var(--foreground));
+  background: #DBEAFE;
+  color: #18181B;
 }
 
 :focus-visible {
-  outline: 2px solid hsl(var(--ring));
+  outline: 2px solid #2563EB;
   outline-offset: 2px;
+}
+
+/* Tabular numbers for stocks count and latency values */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
 }
 
 @media (prefers-reduced-motion: reduce) {

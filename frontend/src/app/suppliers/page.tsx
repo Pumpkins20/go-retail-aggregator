@@ -41,7 +41,7 @@ const pageSize = 20;
 
 const behaviorLabels: Record<string, string> = {
   success: "Success",
-  random_error: "Random error",
+  random_error: "Random Error",
   timeout: "Timeout",
 };
 
@@ -60,7 +60,7 @@ const defaultFormState: SupplierFormState = {
 function formatDate(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
-  return date.toLocaleDateString("id-ID", { dateStyle: "medium" });
+  return date.toLocaleDateString("en-US", { dateStyle: "medium" });
 }
 
 function isValidUrl(value: string) {
@@ -90,9 +90,9 @@ function validateForm(values: SupplierFormState): FormErrors {
   const errors: FormErrors = {};
 
   if (!values.name.trim()) {
-    errors.name = "Name is required";
+    errors.name = "Supplier name is required";
   } else if (values.name.trim().length < 3) {
-    errors.name = "Name must be at least 3 characters";
+    errors.name = "Supplier name must be at least 3 characters";
   }
 
   if (!values.endpoint_url.trim()) {
@@ -140,20 +140,18 @@ export default function SuppliersPage() {
     });
   }, [searchQuery, suppliers]);
 
-  const totalActive = useMemo(
-    () => suppliers.filter((supplier) => supplier.is_active).length,
-    [suppliers]
-  );
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil(filteredSuppliers.length / pageSize)),
     [filteredSuppliers.length]
   );
+  
   const pagedSuppliers = useMemo(() => {
     const start = (page - 1) * pageSize;
     return filteredSuppliers.slice(start, start + pageSize);
   }, [filteredSuppliers, page]);
 
   useEffect(() => {
+    isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
     };
@@ -303,40 +301,47 @@ export default function SuppliersPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 p-6">
-      <div className="mx-auto max-w-7xl space-y-6">
-        <header className="rounded-xl border border-gray-200 bg-white px-5 py-4">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <h1 className="text-2xl font-semibold text-blue-700">Supplier Management</h1>
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
-                <svg viewBox="0 0 24 24" className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="11" cy="11" r="7" />
-                  <path d="m20 20-3.5-3.5" />
-                </svg>
-                <input
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="Quick search..."
-                  className="w-44 bg-transparent text-sm text-gray-700 outline-none placeholder:text-gray-400"
-                />
-              </div>
-              <Button type="button" onClick={openCreateForm} className="h-9 bg-slate-900 px-4 text-sm text-white hover:bg-slate-800">
-                + Add Supplier
-              </Button>
+    <main className="min-h-screen bg-[#FAFAFA] p-6 lg:p-8">
+      <div className="mx-auto max-w-6xl space-y-6">
+        
+        {/* Header Section (Section 3.1 app shell layout) */}
+        <header className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-200 pb-5">
+          <div>
+            <h1 className="text-[28px] font-medium tracking-tight text-zinc-900 font-display">Supplier Management</h1>
+            <p className="mt-0.5 text-sm text-zinc-500 font-body">Manage and aggregate your active inventory sources</p>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            {/* Search Input */}
+            <div className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-1.8 focus-within:ring-2 focus-within:ring-blue-100 focus-within:border-blue-500 transition-all duration-150">
+              <svg viewBox="0 0 24 24" className="h-4 w-4 text-zinc-400" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="7" />
+                <path d="m20 20-3.5-3.5" />
+              </svg>
+              <input
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Quick search..."
+                className="w-40 bg-transparent text-sm text-zinc-700 outline-none placeholder:text-zinc-400 font-body font-medium"
+              />
             </div>
+            
+            {/* Add Supplier Button (zinc-900 default button class) */}
+            <Button type="button" onClick={openCreateForm} className="h-9 rounded-lg bg-zinc-900 hover:bg-zinc-700 text-white px-4 text-xs font-semibold shadow-sm transition-colors duration-150 font-body">
+              + Add Supplier
+            </Button>
           </div>
         </header>
 
         {isLoading ? (
           <div className="space-y-4">
-            <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+            <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
               <div className="space-y-3">
-                <Skeleton className="h-4 w-40" />
-                <Skeleton className="h-3 w-64" />
+                <Skeleton className="h-5 w-40" />
+                <Skeleton className="h-3.5 w-64" />
               </div>
             </div>
-            <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+            <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
               <div className="space-y-3">
                 {Array.from({ length: 4 }).map((_, index) => (
                   <Skeleton key={index} className="h-6 w-full" />
@@ -345,221 +350,281 @@ export default function SuppliersPage() {
             </div>
           </div>
         ) : error ? (
-          <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-destructive">Failed to load suppliers</h2>
-            <p className="mt-2 text-sm text-destructive/80">{error.message}</p>
+          <div className="rounded-xl border border-red-200 bg-red-50/30 p-6 shadow-sm">
+            <h2 className="text-lg font-medium text-red-700 font-display">Failed to load suppliers</h2>
+            <p className="mt-2 text-sm text-red-650 leading-relaxed font-body">{error.message}</p>
             {error.code ? (
-              <p className="mt-3 text-xs text-destructive/70">
+              <p className="mt-3 text-xs text-red-500 font-mono">
                 Error code: {error.code} | HTTP status: {error.status}
               </p>
             ) : null}
           </div>
         ) : suppliers.length === 0 ? (
-          <div className="rounded-xl border border-border bg-card p-8 text-center shadow-sm">
-            <h2 className="font-serif text-xl text-foreground">No suppliers registered</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              No suppliers registered yet. Add a supplier to start monitoring stock.
+          <div className="rounded-xl border border-zinc-200 border-dashed bg-white p-12 text-center shadow-sm max-w-xl mx-auto my-12">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-zinc-50 border border-zinc-200 text-zinc-450 mb-4">
+              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              </svg>
+            </div>
+            <h2 className="font-display text-xl font-medium text-zinc-900">No suppliers registered</h2>
+            <p className="mt-2 text-sm text-zinc-500 leading-relaxed font-body max-w-sm mx-auto">
+              Add at least one supplier source to start consolidating real-time inventory counts.
             </p>
-            <Button type="button" onClick={openCreateForm} className="mt-4">
+            <Button type="button" onClick={openCreateForm} className="mt-5 bg-zinc-900 hover:bg-zinc-700 text-white rounded-lg px-6 font-body text-xs font-semibold h-9 shadow-sm">
               Add your first supplier
             </Button>
           </div>
         ) : (
           <>
-            <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <section className="bg-white rounded-xl border border-zinc-200 shadow-[0_1px_3px_rgba(0,0,0,0.06)] overflow-hidden">
+              <div className="px-5 py-4 border-b border-zinc-100 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <h2 className="text-3xl font-semibold text-gray-900">Registered Suppliers</h2>
-                  <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700">
+                  <h2 className="text-base font-semibold text-zinc-900 font-body">Registered Suppliers</h2>
+                  <span className="bg-zinc-100 text-zinc-650 text-xs font-semibold px-2 py-0.5 rounded-full">
                     {filteredSuppliers.length}
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button type="button" variant="outline" size="sm" className="border-gray-200 bg-white text-gray-600">Filter</Button>
-                  <Button type="button" variant="outline" size="sm" className="border-gray-200 bg-white text-gray-600">Export</Button>
-                </div>
               </div>
 
-              <div className="hidden overflow-hidden rounded-lg border border-gray-200 md:block">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-[0.65rem] uppercase tracking-[0.12em] text-gray-500">
-                  <tr>
-                    <th className="px-6 py-4 text-left font-semibold">#</th>
-                    <th className="px-6 py-4 text-left font-semibold">Supplier</th>
-                    <th className="px-6 py-4 text-left font-semibold">Status</th>
-                    <th className="px-6 py-4 text-left font-semibold">Mock Behavior</th>
-                    <th className="px-6 py-4 text-left font-semibold">Timeout</th>
-                    <th className="px-6 py-4 text-left font-semibold">Created</th>
-                    <th className="px-6 py-4 text-left font-semibold">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {pagedSuppliers.map((supplier, index) => {
-                    const isUpdating = !!updating[supplier.id];
-                    const behaviorLabel = behaviorLabels[supplier.mock_behavior] ?? supplier.mock_behavior;
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-zinc-50 border-b border-zinc-200 text-xs font-semibold text-zinc-500 uppercase tracking-wider">
+                    <tr>
+                      <th className="px-6 py-3.5 w-16 text-center font-body">#</th>
+                      <th className="px-6 py-3.5 font-body">Name & Description</th>
+                      <th className="px-6 py-3.5 w-32 font-body">Status</th>
+                      <th className="px-6 py-3.5 w-44 font-body">Mock Behavior</th>
+                      <th className="px-6 py-3.5 w-28 font-body">Timeout</th>
+                      <th className="px-6 py-3.5 w-36 font-body">Created</th>
+                      <th className="px-6 py-3.5 w-28 text-center font-body">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-100 font-medium">
+                    {pagedSuppliers.map((supplier, index) => {
+                      const isUpdating = !!updating[supplier.id];
+                      const behaviorLabel = behaviorLabels[supplier.mock_behavior] ?? supplier.mock_behavior;
 
-                    return (
-                      <tr key={supplier.id} className="text-gray-800">
-                        <td className="px-6 py-5 text-sm text-gray-600">{(page - 1) * pageSize + index + 1}</td>
-                        <td className="px-6 py-5">
-                          <div>
-                            <p className="text-sm font-semibold text-gray-900">{supplier.name}</p>
-                            {supplier.description ? (
-                              <p className="mt-1 text-xs text-gray-500">
-                                {supplier.description}
-                              </p>
-                            ) : null}
-                          </div>
-                        </td>
-                        <td className="px-6 py-5">
+                      return (
+                        <tr key={supplier.id} className="hover:bg-zinc-50/70 transition-colors duration-100 text-zinc-800">
+                          <td className="px-6 py-4 text-center text-xs text-zinc-400 font-mono">
+                            {supplier.display_order}
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex flex-col">
+                              <p className="text-sm font-semibold text-zinc-900 font-body">{supplier.name}</p>
+                              {supplier.description ? (
+                                <p className="mt-0.5 text-xs text-zinc-450 font-body leading-relaxed max-w-sm">
+                                  {supplier.description}
+                                </p>
+                              ) : null}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-2">
+                              {/* Green switch toggle for supplier states */}
+                              <Switch
+                                checked={supplier.is_active}
+                                onCheckedChange={() => handleToggle(supplier)}
+                                loading={isUpdating}
+                                checkedClass="bg-green-500 border-green-500"
+                                aria-label={`Toggle ${supplier.name}`}
+                              />
+                              <span className={`text-xs font-semibold font-body ${supplier.is_active ? "text-green-600" : "text-zinc-400"}`}>
+                                {supplier.is_active ? "Active" : "Inactive"}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            {supplier.mock_behavior === "success" && (
+                              <span className="inline-flex items-center gap-1 rounded-full border border-green-200 bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700">
+                                Success
+                              </span>
+                            )}
+                            {supplier.mock_behavior === "timeout" && (
+                              <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">
+                                Timeout
+                              </span>
+                            )}
+                            {supplier.mock_behavior === "random_error" && (
+                              <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2.5 py-0.5 text-xs font-medium text-red-700">
+                                Random Error
+                              </span>
+                            )}
+                            {supplier.mock_behavior !== "success" && supplier.mock_behavior !== "timeout" && supplier.mock_behavior !== "random_error" && (
+                              <Badge variant="secondary" className="bg-zinc-100 text-zinc-600 text-xs border-zinc-200 font-medium">
+                                {behaviorLabel}
+                              </Badge>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-xs font-mono text-zinc-600">
+                            {supplier.timeout_ms.toLocaleString("en-US")} ms
+                          </td>
+                          <td className="px-6 py-4 text-xs text-zinc-450">
+                            {formatDate(supplier.created_at)}
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center justify-center gap-1.5">
+                              {/* Edit Button - ghost variant with pencil icon */}
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 rounded-lg text-zinc-400 hover:text-zinc-800 hover:bg-zinc-100"
+                                onClick={() => openEditForm(supplier)}
+                                aria-label="Edit supplier"
+                              >
+                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                </svg>
+                              </Button>
+                              {/* Delete Button - ghost variant with trash icon */}
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 rounded-lg text-zinc-400 hover:text-red-650 hover:bg-red-50"
+                                onClick={() => setDeleteTarget(supplier)}
+                                aria-label="Delete supplier"
+                              >
+                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Card List View */}
+              <div className="block md:hidden divide-y divide-zinc-150">
+                {pagedSuppliers.map((supplier) => {
+                  const isUpdating = !!updating[supplier.id];
+                  const behaviorLabel = behaviorLabels[supplier.mock_behavior] ?? supplier.mock_behavior;
+
+                  return (
+                    <div key={supplier.id} className="p-4 space-y-3 bg-white hover:bg-zinc-50/40">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-zinc-900 font-body">{supplier.name}</p>
+                          {supplier.description ? (
+                            <p className="mt-0.5 text-xs text-zinc-450 font-body leading-relaxed">{supplier.description}</p>
+                          ) : null}
+                        </div>
+                        
+                        {supplier.mock_behavior === "success" && (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-[10px] font-semibold text-green-700">
+                            Success
+                          </span>
+                        )}
+                        {supplier.mock_behavior === "timeout" && (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                            Timeout
+                          </span>
+                        )}
+                        {supplier.mock_behavior === "random_error" && (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-700">
+                            Error
+                          </span>
+                        )}
+                        {supplier.mock_behavior !== "success" && supplier.mock_behavior !== "timeout" && supplier.mock_behavior !== "random_error" && (
+                          <Badge variant="secondary" className="bg-zinc-100 text-zinc-650 text-[10px] border-zinc-200 font-medium">
+                            {behaviorLabel}
+                          </Badge>
+                        )}
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-2 text-xs font-body text-zinc-500 pt-1">
+                        <div>
+                          <span className="text-zinc-400">Timeout: </span>
+                          <span className="font-semibold font-mono text-zinc-700">{supplier.timeout_ms} ms</span>
+                        </div>
+                        <div>
+                          <span className="text-zinc-400">Order: </span>
+                          <span className="font-semibold font-mono text-zinc-700">{supplier.display_order}</span>
+                        </div>
+                        <div className="col-span-2 flex items-center justify-between border-t border-zinc-100 pt-2 mt-1">
                           <div className="flex items-center gap-2">
                             <Switch
                               checked={supplier.is_active}
                               onCheckedChange={() => handleToggle(supplier)}
-                              disabled={isUpdating}
+                              loading={isUpdating}
+                              checkedClass="bg-green-500 border-green-500"
                               aria-label={`Toggle ${supplier.name}`}
                             />
-                            <span className={`text-sm ${supplier.is_active ? "text-green-600" : "text-gray-500"}`}>
+                            <span className={`text-[11px] font-semibold ${supplier.is_active ? "text-green-600" : "text-zinc-400"}`}>
                               {supplier.is_active ? "Active" : "Inactive"}
                             </span>
                           </div>
-                        </td>
-                        <td className="px-6 py-5">
-                          <Badge variant="secondary">{behaviorLabel}</Badge>
-                        </td>
-                        <td className="px-6 py-5 text-gray-700">{supplier.timeout_ms.toLocaleString("id-ID")} ms</td>
-                        <td className="px-6 py-5 text-gray-700">{formatDate(supplier.created_at)}</td>
-                        <td className="px-6 py-5">
-                          <div className="flex items-center gap-2">
-                            <Button type="button" variant="outline" size="sm" className="border-gray-200" onClick={() => openEditForm(supplier)}>
+
+                          <div className="flex gap-2">
+                            <Button type="button" variant="outline" size="sm" className="h-8 rounded-lg border-zinc-200 bg-white" onClick={() => openEditForm(supplier)}>
                               Edit
                             </Button>
                             <Button
                               type="button"
-                              variant="destructive"
+                              variant="ghost"
                               size="sm"
+                              className="h-8 rounded-lg text-red-650 hover:bg-red-50"
                               onClick={() => setDeleteTarget(supplier)}
                             >
                               Delete
                             </Button>
                           </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-              </div>
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-3 px-2 text-sm text-gray-500">
-                <span>
-                  Showing {pagedSuppliers.length} of {filteredSuppliers.length} suppliers
-                </span>
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="border-gray-200 bg-white"
-                    onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-                    disabled={page === 1}
-                  >
-                    Previous
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="border-gray-200 bg-white"
-                    onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-                    disabled={page === totalPages}
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
-            </section>
-
-            <section className="space-y-4 md:hidden">
-              {pagedSuppliers.map((supplier) => {
-                const isUpdating = !!updating[supplier.id];
-                const behaviorLabel = behaviorLabels[supplier.mock_behavior] ?? supplier.mock_behavior;
-
-                return (
-                  <div
-                    key={supplier.id}
-                    className="rounded-xl border border-border bg-card p-5 shadow-sm"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">{supplier.name}</p>
-                        {supplier.description ? (
-                          <p className="mt-1 text-xs text-muted-foreground">{supplier.description}</p>
-                        ) : null}
-                      </div>
-                      <Badge variant="secondary">{behaviorLabel}</Badge>
-                    </div>
-                    <div className="mt-4 grid gap-3 text-xs text-muted-foreground">
-                      <div className="flex items-center justify-between">
-                        <span>Timeout</span>
-                        <span className="text-foreground">{supplier.timeout_ms} ms</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span>Order</span>
-                        <span className="text-foreground">{supplier.display_order}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span>Created</span>
-                        <span className="text-foreground">{formatDate(supplier.created_at)}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span>Status</span>
-                        <div className="flex items-center gap-3">
-                          <Switch
-                            checked={supplier.is_active}
-                            onCheckedChange={() => handleToggle(supplier)}
-                            disabled={isUpdating}
-                            aria-label={`Toggle ${supplier.name}`}
-                          />
-                          <span className="text-foreground">
-                            {supplier.is_active ? "Active" : "Inactive"}
-                          </span>
                         </div>
                       </div>
                     </div>
-                    <div className="mt-4 flex items-center gap-2">
-                      <Button type="button" variant="outline" size="sm" onClick={() => openEditForm(supplier)}>
-                        Edit
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => setDeleteTarget(supplier)}
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
-                <span>
-                  Page {page} of {totalPages}
+                  );
+                })}
+              </div>
+
+              {/* Table Footer with Pagination Controls */}
+              <div className="px-5 py-4 border-t border-zinc-100 flex flex-wrap items-center justify-between gap-3 text-sm text-zinc-500">
+                <span className="font-body text-xs font-medium">
+                  Showing {pagedSuppliers.length} of {filteredSuppliers.length} suppliers
                 </span>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
+                    className="h-8 rounded-lg border-zinc-200 bg-white font-body text-xs"
                     onClick={() => setPage((prev) => Math.max(1, prev - 1))}
                     disabled={page === 1}
                   >
                     Previous
                   </Button>
+                  
+                  {/* Page numbers (Section 5.8 active page: bg-zinc-900) */}
+                  <div className="flex gap-1">
+                    {Array.from({ length: totalPages }).map((_, idx) => {
+                      const p = idx + 1;
+                      const isCurrent = p === page;
+                      return (
+                        <button
+                          key={p}
+                          onClick={() => setPage(p)}
+                          className={`h-8 w-8 rounded-lg text-xs font-semibold transition-all duration-150 ${
+                            isCurrent
+                              ? "bg-zinc-900 text-white shadow-sm"
+                              : "border border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50"
+                          }`}
+                        >
+                          {p}
+                        </button>
+                      );
+                    })}
+                  </div>
+
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
+                    className="h-8 rounded-lg border-zinc-200 bg-white font-body text-xs"
                     onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
                     disabled={page === totalPages}
                   >
@@ -572,203 +637,308 @@ export default function SuppliersPage() {
         )}
       </div>
 
-      {isFormOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6">
-          <div className="w-full max-w-2xl rounded-xl border border-white/40 bg-white/75 p-6 shadow-lg backdrop-blur-sm">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
-                  {formMode === "create" ? "Add Supplier" : "Edit Supplier"}
-                </p>
-                <h2 className="mt-2 text-xl font-semibold text-foreground">
-                  {formMode === "create" ? "Create supplier" : "Update supplier"}
-                </h2>
-              </div>
-              <Button type="button" variant="ghost" size="sm" onClick={closeForm}>
-                Close
-              </Button>
-            </div>
+      {/* Add/Edit Dialog Popover (Section 5.dialog specs) */}
+      {isFormOpen ? (() => {
+        const timeoutVal = formState.timeout_ms;
+        let timeoutLabel = "Standard Timeout";
+        let timeoutColorClass = "text-amber-600 font-semibold";
+        if (timeoutVal < 1500) {
+          timeoutLabel = "Fast Connection";
+          timeoutColorClass = "text-green-600 font-semibold";
+        } else if (timeoutVal > 4000) {
+          timeoutLabel = "High Latency Allowed";
+          timeoutColorClass = "text-red-650 font-semibold";
+        }
 
-            <form onSubmit={handleSubmit} className="mt-6 grid gap-4">
-              <div className="grid gap-3 md:grid-cols-2">
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                    Name
-                  </label>
-                  <input
-                    type="text"
-                    className="w-full rounded-md border border-border px-3 py-2 text-sm text-foreground"
-                    value={formState.name}
-                    onChange={(event) =>
-                      setFormState((prev) => ({ ...prev, name: event.target.value }))
-                    }
-                  />
-                  {formErrors.name ? (
-                    <p className="text-xs text-destructive">{formErrors.name}</p>
-                  ) : null}
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4 py-6 transition-all duration-300 animate-in fade-in">
+            <div className="relative w-full max-w-[560px] max-h-[95vh] overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-6 shadow-[0_4px_6px_rgba(0,0,0,0.05),0_10px_15px_rgba(0,0,0,0.08)] animate-in zoom-in-95 duration-200">
+              
+              {/* Header */}
+              <div className="relative flex items-start justify-between">
+                <div>
+                  <h2 className="text-xl font-medium tracking-tight text-zinc-900 font-display">
+                    {formMode === "create" ? "Add Supplier" : "Edit Supplier"}
+                  </h2>
+                  <p className="mt-1 text-xs text-zinc-450 font-body">
+                    {formMode === "create" ? "Register a new inventory source to monitor." : "Update supplier configuration details."}
+                  </p>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                    Display Order
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    className="w-full rounded-md border border-border px-3 py-2 text-sm text-foreground"
-                    value={formState.display_order}
-                    onChange={(event) =>
-                      setFormState((prev) => ({
-                        ...prev,
-                        display_order: Number(event.target.value),
-                      }))
-                    }
-                  />
-                  {formErrors.display_order ? (
-                    <p className="text-xs text-destructive">{formErrors.display_order}</p>
-                  ) : null}
-                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="rounded-lg text-zinc-400 hover:bg-zinc-50 hover:text-zinc-900 h-8 w-8"
+                  onClick={closeForm}
+                  aria-label="Close dialog"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </Button>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                  Description
-                </label>
-                <textarea
-                  rows={3}
-                  className="w-full rounded-md border border-border px-3 py-2 text-sm text-foreground"
-                  value={formState.description}
-                  onChange={(event) =>
-                    setFormState((prev) => ({ ...prev, description: event.target.value }))
-                  }
-                />
-              </div>
+              <div className="my-4 border-b border-zinc-100" />
 
-              <div className="space-y-2">
-                <label className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                  Endpoint URL
-                </label>
-                <input
-                  type="url"
-                  className="w-full rounded-md border border-border px-3 py-2 text-sm text-foreground"
-                  value={formState.endpoint_url}
-                  onChange={(event) =>
-                    setFormState((prev) => ({ ...prev, endpoint_url: event.target.value }))
-                  }
-                />
-                {formErrors.endpoint_url ? (
-                  <p className="text-xs text-destructive">{formErrors.endpoint_url}</p>
-                ) : null}
-              </div>
-
-              <div className="grid gap-3 md:grid-cols-2">
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                    Auth Type
-                  </label>
-                  <select
-                    className="w-full rounded-md border border-border px-3 py-2 text-sm text-foreground"
-                    value={formState.auth_type}
-                    onChange={(event) =>
-                      setFormState((prev) => ({ ...prev, auth_type: event.target.value }))
-                    }
-                  >
-                    <option value="none">none</option>
-                    <option value="api_key" disabled>
-                      api_key (v1.1)
-                    </option>
-                  </select>
-                  <p className="text-xs text-muted-foreground">API key will be available in v1.1.</p>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                    Mock Behavior
-                  </label>
-                  <select
-                    className="w-full rounded-md border border-border px-3 py-2 text-sm text-foreground"
-                    value={formState.mock_behavior}
-                    onChange={(event) =>
-                      setFormState((prev) => ({ ...prev, mock_behavior: event.target.value }))
-                    }
-                  >
-                    <option value="success">success</option>
-                    <option value="random_error">random_error</option>
-                    <option value="timeout">timeout</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid gap-3 md:grid-cols-2">
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                    Timeout (ms)
-                  </label>
-                  <input
-                    type="range"
-                    min={500}
-                    max={10000}
-                    step={100}
-                    className="w-full"
-                    value={formState.timeout_ms}
-                    onChange={(event) =>
-                      setFormState((prev) => ({
-                        ...prev,
-                        timeout_ms: Number(event.target.value),
-                      }))
-                    }
-                  />
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>500</span>
-                    <span className="text-foreground">{formState.timeout_ms} ms</span>
-                    <span>10000</span>
-                  </div>
-                  {formErrors.timeout_ms ? (
-                    <p className="text-xs text-destructive">{formErrors.timeout_ms}</p>
-                  ) : null}
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                    Active
-                  </label>
-                  <div className="flex items-center gap-3 rounded-md border border-border px-3 py-2">
-                    <Switch
-                      checked={formState.is_active}
-                      onCheckedChange={(checked) =>
-                        setFormState((prev) => ({ ...prev, is_active: checked }))
+              {/* Form Layout */}
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  {/* Supplier Name */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-zinc-700 font-body">
+                      Supplier Name
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Tokopedia Official Store"
+                      className={`w-full h-9 rounded-lg border bg-white px-3 text-sm text-zinc-900 outline-none transition-colors duration-150 font-body ${
+                        formErrors.name ? "border-red-400 focus:ring-2 focus:ring-red-100" : "border-zinc-200 focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400"
+                      }`}
+                      value={formState.name}
+                      onChange={(event) =>
+                        setFormState((prev) => ({ ...prev, name: event.target.value }))
                       }
                     />
-                    <span className="text-sm text-muted-foreground">
-                      {formState.is_active ? "Active" : "Inactive"}
-                    </span>
+                    {formErrors.name ? (
+                      <p className="text-xs text-red-650 font-body mt-1">{formErrors.name}</p>
+                    ) : null}
+                  </div>
+
+                  {/* Display Order */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-zinc-700 font-body">
+                      Display Order
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      className="w-full h-9 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none transition-colors duration-150 font-body focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400"
+                      value={formState.display_order}
+                      onChange={(event) =>
+                        setFormState((prev) => ({
+                          ...prev,
+                          display_order: Number(event.target.value),
+                        }))
+                      }
+                    />
+                    {formErrors.display_order ? (
+                      <p className="text-xs text-red-650 font-body mt-1">{formErrors.display_order}</p>
+                    ) : null}
                   </div>
                 </div>
-              </div>
 
-              <div className="flex flex-wrap items-center justify-end gap-3 border-t border-border pt-4">
-                <Button type="button" variant="outline" onClick={closeForm}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? "Saving" : formMode === "create" ? "Create" : "Update"}
-                </Button>
-              </div>
-            </form>
+                {/* Description */}
+                <div className="space-y-1.5">
+                  <div className="flex justify-between items-center">
+                    <label className="text-xs font-semibold text-zinc-700 font-body">
+                      Description
+                    </label>
+                    <span className="text-[10px] bg-zinc-100 text-zinc-450 px-1.5 py-0.5 rounded font-body">Optional</span>
+                  </div>
+                  <textarea
+                    rows={2}
+                    placeholder="Short description of this supplier..."
+                    className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition-colors duration-150 resize-none font-body focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400"
+                    value={formState.description}
+                    onChange={(event) =>
+                      setFormState((prev) => ({ ...prev, description: event.target.value }))
+                    }
+                  />
+                </div>
+
+                {/* Endpoint URL */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-zinc-700 font-body">
+                    Endpoint URL
+                  </label>
+                  <input
+                    type="url"
+                    placeholder="https://api.supplier.com/stock"
+                    className={`w-full h-9 rounded-lg border bg-white px-3 text-sm text-zinc-900 outline-none transition-colors duration-150 font-body ${
+                      formErrors.endpoint_url ? "border-red-400 focus:ring-2 focus:ring-red-100" : "border-zinc-200 focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400"
+                    }`}
+                    value={formState.endpoint_url}
+                    onChange={(event) =>
+                      setFormState((prev) => ({ ...prev, endpoint_url: event.target.value }))
+                    }
+                  />
+                  <p className="text-[10px] text-zinc-400 font-body mt-1">The URL called to fetch live stock totals.</p>
+                  {formErrors.endpoint_url ? (
+                    <p className="text-xs text-red-650 font-body mt-1">{formErrors.endpoint_url}</p>
+                  ) : null}
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  {/* Authentication select (Section 5.5 option api key disabled) */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-zinc-700 font-body">
+                      Authentication
+                    </label>
+                    <div className="relative">
+                      <select
+                        className="w-full appearance-none rounded-lg border border-zinc-200 bg-white pl-3.5 pr-10 h-9 text-sm text-zinc-800 outline-none transition-colors duration-150 font-body focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400"
+                        value={formState.auth_type}
+                        onChange={(event) =>
+                          setFormState((prev) => ({ ...prev, auth_type: event.target.value }))
+                        }
+                      >
+                        <option value="none">None</option>
+                        <option value="api_key" disabled className="opacity-40">
+                          API Key (v1.1 coming soon)
+                        </option>
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3.5">
+                        <svg className="h-4 w-4 text-zinc-450" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Mock Behavior Select */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-semibold text-zinc-700 font-body">
+                        Mock Behavior
+                      </label>
+                      <span className="text-[10px] bg-zinc-150 text-zinc-500 px-1.5 py-0.5 rounded font-body font-semibold">Demo Only</span>
+                    </div>
+                    <div className="relative">
+                      <select
+                        className="w-full appearance-none rounded-lg border border-zinc-200 bg-white pl-3.5 pr-10 h-9 text-sm text-zinc-800 outline-none transition-colors duration-150 font-body focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400"
+                        value={formState.mock_behavior}
+                        onChange={(event) =>
+                          setFormState((prev) => ({ ...prev, mock_behavior: event.target.value }))
+                        }
+                      >
+                        <option value="success">Always Success</option>
+                        <option value="random_error">Random Error (20%)</option>
+                        <option value="timeout">Always Timeout</option>
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3.5">
+                        <svg className="h-4 w-4 text-zinc-450" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-zinc-450 font-body mt-1">Simulates network status during queries.</p>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2 pt-2">
+                  {/* Timeout Slider */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center text-xs font-semibold text-zinc-700 font-body">
+                      <span>Request Timeout</span>
+                      <span className="font-mono text-zinc-900 bg-zinc-100 px-2 py-0.5 rounded">
+                        {formState.timeout_ms.toLocaleString("en-US")} ms
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={500}
+                      max={10000}
+                      step={100}
+                      className="w-full accent-zinc-900 cursor-pointer"
+                      value={formState.timeout_ms}
+                      onChange={(event) =>
+                        setFormState((prev) => ({
+                          ...prev,
+                          timeout_ms: Number(event.target.value),
+                        }))
+                      }
+                    />
+                    <div className="flex items-center justify-between text-[10px] font-semibold text-zinc-450 font-body">
+                      <span>500 ms</span>
+                      <span className={timeoutColorClass}>{timeoutLabel}</span>
+                      <span>10,000 ms</span>
+                    </div>
+                  </div>
+
+                  {/* Active Switch */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-zinc-700 font-body block">
+                      Supplier Active State
+                    </label>
+                    <div className="flex items-center gap-3 rounded-lg border border-zinc-200 bg-zinc-50/50 px-3.5 h-9">
+                      <Switch
+                        checked={formState.is_active}
+                        onCheckedChange={(checked) =>
+                          setFormState((prev) => ({ ...prev, is_active: checked }))
+                        }
+                        checkedClass="bg-green-500 border-green-500"
+                      />
+                      <span className="text-xs font-semibold text-zinc-500 font-body">
+                        {formState.is_active ? "Enabled" : "Disabled"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="my-2 border-b border-zinc-100" />
+
+                {/* Footer buttons */}
+                <div className="flex items-center justify-end gap-3 pt-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-9 rounded-lg text-zinc-650 hover:bg-zinc-100 px-4 text-xs font-semibold font-body"
+                    onClick={closeForm}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="h-9 rounded-lg bg-zinc-900 hover:bg-zinc-700 text-white px-5 text-xs font-semibold shadow-sm transition-colors duration-150 font-body"
+                  >
+                    {isSubmitting ? "Saving..." : formMode === "create" ? "Save Supplier" : "Save Changes"}
+                  </Button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
-      ) : null}
+        );
+      })() : null}
 
+      {/* Delete confirmation dialog (Section 5.7 AlertDialog specs) */}
       {deleteTarget ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6">
-          <div className="w-full max-w-md rounded-xl bg-card p-6 shadow-lg">
-            <h2 className="text-lg font-semibold text-foreground">Delete supplier</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Delete {deleteTarget.name}? This action cannot be undone.
-            </p>
-            <div className="mt-6 flex items-center justify-end gap-3">
-              <Button type="button" variant="outline" onClick={() => setDeleteTarget(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4 py-6 transition-all duration-300 animate-in fade-in">
+          <div className="relative w-full max-w-[400px] rounded-2xl border border-zinc-200 bg-white p-6 shadow-[0_4px_6px_rgba(0,0,0,0.05),0_10px_15px_rgba(0,0,0,0.08)] animate-in zoom-in-95 duration-200">
+            <div className="relative flex flex-col items-center text-center">
+              
+              {/* Top Red Trash Icon Container */}
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-50 border border-red-200 text-red-600 mb-4">
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </div>
+
+              <h2 className="text-lg font-medium text-zinc-950 font-display">Delete supplier?</h2>
+
+              <p className="mt-2 text-sm text-zinc-500 leading-relaxed font-body">
+                This will permanently remove <span className="font-semibold text-zinc-900">{deleteTarget.name}</span> and cannot be undone.
+              </p>
+            </div>
+
+            {/* Buttons */}
+            <div className="mt-6 flex gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-9 rounded-lg border-zinc-200 bg-white text-zinc-700 flex-1 font-body text-xs font-semibold"
+                onClick={() => setDeleteTarget(null)}
+              >
                 Cancel
               </Button>
-              <Button type="button" variant="destructive" onClick={handleDeleteConfirm} disabled={isDeleting}>
-                {isDeleting ? "Deleting" : "Delete"}
+              <Button
+                type="button"
+                variant="destructive"
+                className="h-9 rounded-lg bg-red-600 hover:bg-red-700 text-white flex-1 font-body text-xs font-semibold shadow-sm transition-colors"
+                onClick={handleDeleteConfirm}
+                disabled={isDeleting}
+              >
+                {isDeleting ? "Deleting..." : "Delete"}
               </Button>
             </div>
           </div>

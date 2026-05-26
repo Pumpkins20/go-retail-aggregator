@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { toast } from "sonner";
 
 import { SupplierCard, type SupplierStatus } from "@/components/SupplierCard";
 import { SupplierCardSkeleton } from "@/components/SupplierCardSkeleton";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { Card, CardContent } from "@/components/ui/card";
 import { ApiClientError, getStock } from "@/lib/api";
 import type { StockResponse } from "@/types";
 
@@ -18,7 +19,6 @@ interface UiError {
 
 const validStatuses: SupplierStatus[] = ["SUCCESS", "TIMEOUT", "ERROR"];
 const relativeTimeFormatter = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
-const healthBars = [40, 28, 56, 36, 64, 20, 42, 30];
 
 function formatRelativeTime(date: Date, now: number) {
   const diffSeconds = Math.round((date.getTime() - now) / 1000);
@@ -42,9 +42,15 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(false);
+  const [secondsRemaining, setSecondsRemaining] = useState(30);
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
   const [animatedTotal, setAnimatedTotal] = useState(0);
   const [error, setError] = useState<UiError | null>(null);
+
+  // Filter & Search states
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [sortBy, setSortBy] = useState<string>("NAME_ASC");
 
   const isFetchingRef = useRef(false);
   const isMountedRef = useRef(true);
@@ -58,6 +64,7 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
+    isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
       if (autoRefreshTimerRef.current) clearInterval(autoRefreshTimerRef.current);
@@ -121,11 +128,20 @@ export default function Dashboard() {
       autoRefreshTimerRef.current = null;
     }
 
-    if (!autoRefresh) return;
+    if (!autoRefresh) {
+      setSecondsRemaining(30);
+      return;
+    }
 
     autoRefreshTimerRef.current = setInterval(() => {
-      loadStock({ silent: true });
-    }, 30000);
+      setSecondsRemaining((prev) => {
+        if (prev <= 1) {
+          loadStock({ silent: true });
+          return 30;
+        }
+        return prev - 1;
+      });
+    }, 1000);
 
     return () => {
       if (autoRefreshTimerRef.current) {
@@ -135,17 +151,20 @@ export default function Dashboard() {
     };
   }, [autoRefresh, loadStock]);
 
+  // Section 7.1 Counter Animation using easeOutExpo/quart logic
   useEffect(() => {
     if (!data) return;
 
     const target = data.total_stock ?? 0;
-    const duration = 700;
+    const duration = 800; // Counter animation is 800ms
     const start = performance.now();
     let frameId = 0;
 
     const tick = (t: number) => {
-      const progress = Math.min((t - start) / duration, 1);
-      setAnimatedTotal(Math.round(target * progress));
+      const elapsed = t - start;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 4); // easeOutQuart
+      setAnimatedTotal(Math.round(target * eased));
       if (progress < 1) frameId = requestAnimationFrame(tick);
     };
 
@@ -154,19 +173,102 @@ export default function Dashboard() {
   }, [data]);
 
   const handleSyncNow = () => {
+    setSecondsRemaining(30);
     loadStock();
   };
 
+  const suppliers = data?.suppliers ?? [];
+  const successSources = data?.successful_sources ?? 0;
+  const failedSources = data?.failed_sources ?? 0;
+  const totalSources = successSources + failedSources;
+
+  // Filtered & Sorted suppliers
+  const filteredAndSortedSuppliers = useMemo(() => {
+    let result = [...suppliers];
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(
+        (s) =>
+          s.supplier_name.toLowerCase().includes(q) ||
+          (s.description ?? "").toLowerCase().includes(q)
+      );
+    }
+
+    if (statusFilter !== "ALL") {
+      result = result.filter((s) => s.status === statusFilter);
+    }
+
+    result.sort((a, b) => {
+      if (sortBy === "NAME_ASC") return a.supplier_name.localeCompare(b.supplier_name);
+      if (sortBy === "NAME_DESC") return b.supplier_name.localeCompare(a.supplier_name);
+      if (sortBy === "STOCK_DESC") return b.stock - a.stock;
+      if (sortBy === "STOCK_ASC") return a.stock - b.stock;
+      if (sortBy === "LATENCY_ASC") return a.latency_ms - b.latency_ms;
+      if (sortBy === "LATENCY_DESC") return b.latency_ms - a.latency_ms;
+      return 0;
+    });
+
+    return result;
+  }, [suppliers, searchQuery, statusFilter, sortBy]);
+
+  // Compute dynamic stats
+  const averageLatency = useMemo(() => {
+    const successItems = suppliers.filter((s) => s.status === "SUCCESS");
+    if (successItems.length === 0) return 0;
+    const sum = successItems.reduce((acc, s) => acc + s.latency_ms, 0);
+    return Math.round(sum / successItems.length);
+  }, [suppliers]);
+
+  const healthScorePercent = useMemo(() => {
+    if (totalSources === 0) return 0;
+    return Math.round((successSources / totalSources) * 100);
+  }, [successSources, totalSources]);
+
+  // Map dynamic latency chart bars
+  const chartBars = useMemo(() => {
+    return suppliers.map((s) => {
+      // Normalise height: 3500ms timeout threshold is 100% height limit
+      const pct = Math.min((s.latency_ms / 3500) * 100, 100);
+      return {
+        name: s.supplier_name,
+        latency: s.latency_ms,
+        status: s.status,
+        height: pct,
+      };
+    });
+  }, [suppliers]);
+
   if (isLoading && !data) {
     return (
-      <main className="min-h-screen bg-gray-50 p-6">
-        <div className="space-y-4">
-          <SupplierCardSkeleton />
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <SupplierCardSkeleton />
-            <SupplierCardSkeleton />
-            <SupplierCardSkeleton />
-            <SupplierCardSkeleton />
+      <main className="min-h-screen bg-[#FAFAFA] p-6 lg:p-8">
+        <div className="space-y-6 max-w-6xl mx-auto">
+          {/* Header Skeleton */}
+          <div className="flex items-center justify-between border-b border-zinc-200 pb-5">
+            <div className="space-y-2">
+              <div className="h-7 w-48 rounded bg-zinc-200 animate-pulse" />
+              <div className="h-4 w-64 rounded bg-zinc-200 animate-pulse" />
+            </div>
+            <div className="h-9 w-32 rounded-lg bg-zinc-200 animate-pulse" />
+          </div>
+
+          {/* Quick Stats Grid Skeleton */}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="h-24 rounded-xl border border-zinc-200 bg-white p-5 animate-pulse" />
+            ))}
+          </div>
+
+          {/* Filters Bar Skeleton */}
+          <div className="h-14 rounded-xl border border-zinc-200 bg-white animate-pulse" />
+
+          {/* Layout Columns Skeleton */}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <div className="h-80 rounded-xl border border-zinc-200 bg-white animate-pulse" />
+            <div className="lg:col-span-2 grid grid-cols-1 gap-4 md:grid-cols-2">
+              <SupplierCardSkeleton />
+              <SupplierCardSkeleton />
+            </div>
           </div>
         </div>
       </main>
@@ -175,53 +277,108 @@ export default function Dashboard() {
 
   if (error && !data) {
     return (
-      <main className="min-h-screen bg-gray-50 p-6">
-        <div className="rounded-lg border border-red-200 bg-white p-6">
-          <h2 className="text-lg font-semibold text-red-700">Failed to load dashboard</h2>
-          <p className="mt-2 text-sm text-red-600">{error.message}</p>
+      <main className="min-h-screen bg-[#FAFAFA] p-6 flex items-center justify-center">
+        <div className="rounded-2xl border border-red-200 bg-white p-8 max-w-md shadow-sm text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-650 mb-4 border border-red-200">
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <h2 className="text-lg font-medium text-zinc-950 font-display">Failed to load aggregated dashboard</h2>
+          <p className="mt-2 text-sm text-zinc-500 leading-relaxed font-body">{error.message}</p>
+          <Button type="button" onClick={handleSyncNow} className="mt-5 w-full bg-zinc-900 hover:bg-zinc-700 text-white font-medium rounded-lg">
+            Retry Connection
+          </Button>
         </div>
       </main>
     );
   }
 
-  const suppliers = data?.suppliers ?? [];
-  const successSources = data?.successful_sources ?? 0;
-  const failedSources = data?.failed_sources ?? 0;
-  const totalSources = successSources + failedSources;
   const totalStock = new Intl.NumberFormat("en-US").format(animatedTotal);
   const lastSyncedLabel = lastSyncedAt ? formatRelativeTime(lastSyncedAt, now) : "just now";
 
   return (
-    <main className="min-h-screen bg-gray-50 p-6">
-      <div className="space-y-6">
-        <header className="flex items-center justify-between border-b border-gray-200 pb-4">
-          <h1 className="text-3xl font-semibold text-blue-700">Dashboard</h1>
+    <main className="min-h-screen bg-[#FAFAFA] p-6 lg:p-8">
+      <div className="space-y-6 max-w-6xl mx-auto">
+        
+        {/* TOP BAR Header Controls (Section 3.1) */}
+        <header className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-200 pb-5">
+          <div>
+            <h1 className="text-[28px] font-medium tracking-tight text-zinc-900 font-display">Command Center</h1>
+            <p className="mt-0.5 text-sm text-zinc-500 font-body">Real-time stock aggregator overview</p>
+          </div>
 
           <div className="flex items-center gap-3">
+            {/* Auto Refresh Switch Container */}
             <div
-              className={`flex items-center gap-2 rounded-full border px-3 py-1.5 transition-colors ${
-                autoRefresh ? "border-blue-200 bg-blue-50" : "border-gray-200 bg-gray-100"
+              className={`flex items-center gap-3 rounded-lg border px-3 py-1.5 transition-all duration-150 shadow-sm ${
+                autoRefresh
+                  ? "border-blue-200 bg-blue-50/70"
+                  : "border-zinc-200 bg-zinc-50"
               }`}
             >
-              <span className={`text-xs ${autoRefresh ? "text-blue-700" : "text-gray-600"}`}>
-                Auto-refresh
-              </span>
-              <Switch checked={autoRefresh} onCheckedChange={setAutoRefresh} />
+              <div className="flex flex-col">
+                <span className={`text-[11px] font-semibold uppercase tracking-wider ${autoRefresh ? "text-blue-700" : "text-zinc-500"}`}>
+                  Auto-refresh
+                </span>
+                {autoRefresh ? (
+                  <span className="text-[10px] text-blue-500 font-medium">
+                    Syncing in {secondsRemaining}s
+                  </span>
+                ) : (
+                  <span className="text-[10px] text-zinc-400 font-medium">
+                    Disabled
+                  </span>
+                )}
+              </div>
+
+              <div className="relative flex items-center gap-2">
+                {autoRefresh && (
+                  <div className="relative flex items-center justify-center w-5 h-5">
+                    <svg className="w-5 h-5 transform -rotate-90">
+                      <circle
+                        cx="10"
+                        cy="10"
+                        r="8"
+                        className="text-blue-100"
+                        strokeWidth="1.5"
+                        stroke="currentColor"
+                        fill="transparent"
+                      />
+                      <circle
+                        cx="10"
+                        cy="10"
+                        r="8"
+                        className="text-blue-600 transition-all duration-300 ease-linear"
+                        strokeWidth="1.5"
+                        strokeDasharray={2 * Math.PI * 8}
+                        strokeDashoffset={(2 * Math.PI * 8) * (1 - secondsRemaining / 30)}
+                        strokeLinecap="round"
+                        stroke="currentColor"
+                        fill="transparent"
+                      />
+                    </svg>
+                  </div>
+                )}
+                {/* Custom toggle with green option or standard checked */}
+                <Switch checked={autoRefresh} onCheckedChange={setAutoRefresh} />
+              </div>
             </div>
 
+            {/* Sync Now Button - styled as outline */}
             <Button
               type="button"
               onClick={handleSyncNow}
               disabled={isRefreshing}
-              className="h-8 rounded-md border border-blue-600 bg-white px-3 text-xs font-medium text-blue-600 hover:bg-blue-50"
+              className="h-9 rounded-lg border border-zinc-200 bg-white px-4 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 shadow-sm"
             >
               <svg
                 aria-hidden="true"
                 viewBox="0 0 24 24"
-                className={`mr-1.5 h-3.5 w-3.5 text-blue-600 ${isRefreshing ? "animate-spin" : ""}`}
+                className={`mr-1.5 h-3.5 w-3.5 text-zinc-500 ${isRefreshing ? "animate-spin" : ""}`}
                 fill="none"
                 stroke="currentColor"
-                strokeWidth="2"
+                strokeWidth="1.8"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               >
@@ -233,47 +390,204 @@ export default function Dashboard() {
           </div>
         </header>
 
-        <section className="rounded-lg border border-gray-200 bg-white p-6">
-          <p className="text-xs uppercase tracking-[0.22em] text-gray-500">Total Inventory</p>
-          <div className="mt-3 flex flex-wrap items-end gap-3">
-            <p className="font-serif text-6xl leading-none text-gray-900">{totalStock}</p>
-            <div className="pb-2 text-sm text-gray-600">
-              <p>
-                {successSources} of {totalSources} sources online
-              </p>
-              <p className="text-xs text-gray-400">Last synced {lastSyncedLabel}</p>
-            </div>
-          </div>
+        {/* 4 Quick Stats Indicator Cards */}
+        <section className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Card className="border border-zinc-200 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.06)] hover:border-zinc-300 transition-all duration-200">
+            <CardContent className="p-5 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 font-body">Total Aggregated Stock</p>
+                <p className="mt-1 text-3xl font-semibold text-zinc-900 font-body tabular-nums leading-none">{totalStock}</p>
+                <p className="mt-1.5 text-[11px] text-zinc-400 font-medium font-body">Synced {lastSyncedLabel}</p>
+              </div>
+              <div className="h-10 w-10 flex items-center justify-center rounded-lg bg-zinc-50 border border-zinc-100 text-zinc-500">
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                </svg>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border border-zinc-200 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.06)] hover:border-zinc-300 transition-all duration-200">
+            <CardContent className="p-5 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 font-body">Network Success Rate</p>
+                <p className="mt-1 text-3xl font-semibold text-zinc-900 font-body tabular-nums leading-none">{healthScorePercent}%</p>
+                <div className="mt-2.5 h-1.5 w-32 rounded-full bg-zinc-100 overflow-hidden">
+                  <div className="h-full bg-green-500 rounded-full transition-all duration-500" style={{ width: `${healthScorePercent}%` }} />
+                </div>
+              </div>
+              <div className="h-10 w-10 flex items-center justify-center rounded-lg bg-green-50 border border-green-200 text-green-700">
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border border-zinc-200 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.06)] hover:border-zinc-300 transition-all duration-200">
+            <CardContent className="p-5 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 font-body">Average Source Latency</p>
+                <p className="mt-1 text-3xl font-semibold text-zinc-900 font-body tabular-nums leading-none">{averageLatency} ms</p>
+                <p className="mt-1.5 text-[11px] text-zinc-400 font-medium font-body">Across active suppliers</p>
+              </div>
+              <div className="h-10 w-10 flex items-center justify-center rounded-lg bg-zinc-50 border border-zinc-100 text-zinc-500">
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border border-zinc-200 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.06)] hover:border-zinc-300 transition-all duration-200">
+            <CardContent className="p-5 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 font-body">Supplier Integration</p>
+                <p className="mt-1 text-3xl font-semibold text-zinc-900 font-body tabular-nums leading-none">{successSources} / {totalSources}</p>
+                <p className="mt-1.5 text-[11px] text-zinc-450 font-medium font-body">{failedSources} failed source(s)</p>
+              </div>
+              <div className="h-10 w-10 flex items-center justify-center rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-100">
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
+                </svg>
+              </div>
+            </CardContent>
+          </Card>
         </section>
 
-        <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {suppliers.map((supplier) => (
-            <SupplierCard key={supplier.supplier_id} supplier={{ ...supplier, status: toSupplierStatus(supplier.status) }} />
-          ))}
-        </section>
+        {/* Unified Search, Sort, and Status Filter Bar */}
+        <section className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm flex flex-wrap items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
+            {/* Search Input */}
+            <div className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50/50 px-3 py-1.8 flex-1 max-w-sm focus-within:ring-2 focus-within:ring-blue-100 focus-within:border-blue-500 transition-all duration-150">
+              <svg viewBox="0 0 24 24" className="h-4 w-4 text-zinc-450" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="7" />
+                <path d="m20 20-3.5-3.5" />
+              </svg>
+              <input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search suppliers name..."
+                className="w-full bg-transparent text-sm text-zinc-800 outline-none placeholder:text-zinc-400 font-body font-medium"
+              />
+            </div>
 
-        <section className="rounded-lg border border-gray-200 bg-white p-5">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-800">Network Health</h2>
-            <div className="flex gap-2">
-              <span className="h-2.5 w-2.5 rounded-full bg-green-500" />
-              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-              <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
-              <span className="h-2.5 w-2.5 rounded-full bg-red-500" />
+            {/* Sorting Select */}
+            <div className="relative">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="appearance-none rounded-lg border border-zinc-200 bg-white pl-4 pr-10 py-1.8 text-sm text-zinc-700 font-medium cursor-pointer outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 shadow-sm transition-all duration-150 font-body"
+              >
+                <option value="NAME_ASC">Name: A - Z</option>
+                <option value="NAME_DESC">Name: Z - A</option>
+                <option value="STOCK_DESC">Stock: High to Low</option>
+                <option value="STOCK_ASC">Stock: Low to High</option>
+                <option value="LATENCY_ASC">Latency: Fastest first</option>
+                <option value="LATENCY_DESC">Latency: Slowest first</option>
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3.5">
+                <svg className="h-4 w-4 text-zinc-450" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
             </div>
           </div>
 
-          <div className="flex h-36 items-end gap-1.5">
-            {healthBars.map((bar, idx) => (
-              <div key={idx} className="flex-1 rounded-sm bg-blue-100" style={{ height: `${bar}%` }} />
+          {/* Status filter selection tabs (Section 5.8 pagination/tabs aesthetic) */}
+          <div className="flex rounded-lg bg-zinc-100 p-1 border border-zinc-200/50">
+            {["ALL", "SUCCESS", "TIMEOUT", "ERROR"].map((status) => (
+              <button
+                key={status}
+                onClick={() => setStatusFilter(status)}
+                className={`rounded-md px-3 py-1 text-xs font-semibold uppercase tracking-wider transition-all duration-150 ${
+                  statusFilter === status
+                    ? "bg-white text-zinc-900 shadow-sm"
+                    : "text-zinc-500 hover:text-zinc-900"
+                }`}
+              >
+                {status}
+              </button>
             ))}
           </div>
-
-          <p className="mt-3 text-xs text-gray-400">Sync throughput averaged 14.2 MB/s over last 24h.</p>
-          {failedSources > 0 ? (
-            <p className="mt-2 text-xs text-red-500">{failedSources} source(s) need attention.</p>
-          ) : null}
         </section>
+
+        {/* Dynamic Latency Visual Chart & Supplier Cards Grid */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          
+          {/* Latency Health chart column (preserved grid layout) */}
+          <section className="lg:col-span-1 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm flex flex-col justify-between">
+            <div>
+              <h2 className="text-base font-semibold tracking-tight text-zinc-900 font-body">Dynamic Latency Health</h2>
+              <p className="text-xs text-zinc-450 mt-0.5 font-body">Real-time latency profiling chart (ms)</p>
+            </div>
+
+            {/* Custom SVG Bar Chart */}
+            <div className="flex h-44 items-end gap-3 pt-6 border-b border-zinc-100 pb-2">
+              {chartBars.map((bar, idx) => {
+                let color = "bg-green-500 hover:bg-green-600";
+                if (bar.status === "TIMEOUT") color = "bg-amber-500 hover:bg-amber-600";
+                if (bar.status === "ERROR") color = "bg-red-500 hover:bg-red-600";
+
+                return (
+                  <div key={idx} className="group relative flex-1 flex flex-col items-center">
+                    {/* Tooltip on hover */}
+                    <div className="pointer-events-none absolute bottom-full mb-2 w-32 rounded-lg bg-zinc-900 px-2 py-1.5 text-center text-[10px] text-white opacity-0 shadow-md transition-opacity group-hover:opacity-100 z-10 leading-normal">
+                      <p className="font-bold truncate">{bar.name}</p>
+                      <p className="font-semibold text-blue-300 mt-0.5">{bar.latency} ms</p>
+                      <p className="text-[9px] uppercase font-bold text-gray-400">{bar.status}</p>
+                    </div>
+                    
+                    {/* The bar */}
+                    <div 
+                      className={`w-full rounded-t-md transition-all duration-150 cursor-pointer shadow-sm ${color}`} 
+                      style={{ height: `${Math.max(bar.height, 4)}%` }} 
+                    />
+                    
+                    {/* Label */}
+                    <span className="mt-2 text-[9px] font-bold text-zinc-400 truncate w-full text-center font-body">
+                      {bar.name.substring(0, 5)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="mt-4 text-xs text-zinc-500 leading-normal space-y-1 font-body">
+              <p className="font-semibold text-[11px] text-zinc-650">Throughput Average: 14.2 MB/s</p>
+              {failedSources > 0 ? (
+                <p className="text-red-600 flex items-center gap-1 font-medium">
+                  <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-ping" />
+                  {failedSources} source(s) offline. Needs attention.
+                </p>
+              ) : (
+                <p className="text-green-600 flex items-center gap-1 font-medium">
+                  <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                  All sources operating normally.
+                </p>
+              )}
+            </div>
+          </section>
+
+          {/* Supplier Cards grid column (preserved grid layout) */}
+          <section className="lg:col-span-2 grid grid-cols-1 gap-4 md:grid-cols-2">
+            {filteredAndSortedSuppliers.length === 0 ? (
+              <div className="col-span-full rounded-xl border border-zinc-200 border-dashed bg-white p-12 text-center shadow-sm">
+                <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-zinc-50 text-zinc-400 mb-3 border border-zinc-200">
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h3 className="text-sm font-semibold text-zinc-800 font-body">No matching suppliers</h3>
+                <p className="mt-1 text-xs text-zinc-400 font-body">Try adjusting your filters or search keywords.</p>
+              </div>
+            ) : (
+              filteredAndSortedSuppliers.map((supplier) => (
+                <SupplierCard key={supplier.supplier_id} supplier={{ ...supplier, status: toSupplierStatus(supplier.status) }} />
+              ))
+            )}
+          </section>
+        </div>
       </div>
     </main>
   );
