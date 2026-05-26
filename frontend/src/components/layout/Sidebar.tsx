@@ -59,8 +59,8 @@ export function Sidebar() {
     <aside className="sticky top-0 hidden h-screen w-64 shrink-0 border-r border-gray-200 bg-white lg:block">
       <div className="flex h-full flex-col px-4 py-5">
         <div className="px-2">
-          <h1 className="font-serif text-2xl leading-none text-blue-700">CommandCenter</h1>
-          <p className="mt-1 text-xs text-gray-500">Retail Ops v1.0</p>
+          <h1 className="font-serif text-2xl leading-none text-blue-700">Retail Aggregator</h1>
+          <p className="mt-1 text-xs text-gray-500">v1.0</p>
         </div>
 
         <nav className="mt-8 space-y-1" aria-label="Main Navigation">

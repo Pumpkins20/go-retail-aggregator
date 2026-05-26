@@ -114,6 +114,7 @@ function validateForm(values: SupplierFormState): FormErrors {
 
 export default function SuppliersPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<UiError | null>(null);
   const [updating, setUpdating] = useState<Record<string, boolean>>({});
@@ -126,23 +127,31 @@ export default function SuppliersPage() {
   const [deleteTarget, setDeleteTarget] = useState<Supplier | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [page, setPage] = useState(1);
-  const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
-  const [editingOrderValue, setEditingOrderValue] = useState("0");
-  const [savingOrderId, setSavingOrderId] = useState<string | null>(null);
   const isMountedRef = useRef(true);
+
+  const filteredSuppliers = useMemo(() => {
+    if (!searchQuery.trim()) return suppliers;
+    const q = searchQuery.toLowerCase();
+    return suppliers.filter((supplier) => {
+      return (
+        supplier.name.toLowerCase().includes(q) ||
+        (supplier.description ?? "").toLowerCase().includes(q)
+      );
+    });
+  }, [searchQuery, suppliers]);
 
   const totalActive = useMemo(
     () => suppliers.filter((supplier) => supplier.is_active).length,
     [suppliers]
   );
   const totalPages = useMemo(
-    () => Math.max(1, Math.ceil(suppliers.length / pageSize)),
-    [suppliers.length]
+    () => Math.max(1, Math.ceil(filteredSuppliers.length / pageSize)),
+    [filteredSuppliers.length]
   );
   const pagedSuppliers = useMemo(() => {
     const start = (page - 1) * pageSize;
-    return suppliers.slice(start, start + pageSize);
-  }, [page, suppliers]);
+    return filteredSuppliers.slice(start, start + pageSize);
+  }, [filteredSuppliers, page]);
 
   useEffect(() => {
     return () => {
@@ -293,76 +302,28 @@ export default function SuppliersPage() {
     }
   }
 
-  function startOrderEdit(supplier: Supplier) {
-    setEditingOrderId(supplier.id);
-    setEditingOrderValue(String(supplier.display_order));
-  }
-
-  function cancelOrderEdit() {
-    setEditingOrderId(null);
-    setEditingOrderValue("0");
-  }
-
-  async function commitOrderEdit(supplier: Supplier) {
-    const parsed = Number(editingOrderValue);
-    if (!Number.isFinite(parsed) || parsed < 0) {
-      toast.error("Display order must be 0 or higher.");
-      return;
-    }
-
-    setSavingOrderId(supplier.id);
-    try {
-      await updateSupplier(supplier.id, {
-        name: supplier.name,
-        description: supplier.description,
-        endpoint_url: supplier.endpoint_url,
-        auth_type: supplier.auth_type,
-        auth_token: supplier.auth_token,
-        timeout_ms: supplier.timeout_ms,
-        is_active: supplier.is_active,
-        mock_behavior: supplier.mock_behavior,
-        display_order: parsed,
-      });
-      setSuppliers((prev) =>
-        prev.map((item) => (item.id === supplier.id ? { ...item, display_order: parsed } : item))
-      );
-      toast.success("Display order updated.");
-    } catch (err: unknown) {
-      if (err instanceof ApiClientError) {
-        toast.error(err.message);
-      } else {
-        toast.error("Failed to update display order.");
-      }
-    } finally {
-      setSavingOrderId(null);
-      setEditingOrderId(null);
-    }
-  }
-
   return (
-    <main className="min-h-screen px-4 pb-12 pt-24 md:px-6 md:pt-28 lg:px-10 lg:pt-12">
-      <div className="mx-auto max-w-6xl space-y-6">
-        <header className="rounded-xl border border-border bg-card p-6 shadow-sm">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <p className="text-xs uppercase tracking-[0.32em] text-muted-foreground">
-                Supplier Management
-              </p>
-              <h1 className="mt-3 text-3xl font-semibold text-foreground">All Suppliers</h1>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Manage availability across {suppliers.length} suppliers with real-time status.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <Button type="button" onClick={openCreateForm}>
-                Add Supplier
-              </Button>
-              <div className="rounded-lg border border-border bg-card px-4 py-3 text-xs text-muted-foreground">
-                <p className="text-[0.6rem] uppercase tracking-[0.24em] text-muted-foreground">
-                  Active Sources
-                </p>
-                <p className="mt-2 text-lg font-semibold text-foreground">{totalActive}</p>
+    <main className="min-h-screen bg-gray-50 p-6">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <header className="rounded-xl border border-gray-200 bg-white px-5 py-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <h1 className="text-2xl font-semibold text-blue-700">Supplier Management</h1>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                <svg viewBox="0 0 24 24" className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="11" cy="11" r="7" />
+                  <path d="m20 20-3.5-3.5" />
+                </svg>
+                <input
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Quick search..."
+                  className="w-44 bg-transparent text-sm text-gray-700 outline-none placeholder:text-gray-400"
+                />
               </div>
+              <Button type="button" onClick={openCreateForm} className="h-9 bg-slate-900 px-4 text-sm text-white hover:bg-slate-800">
+                + Add Supplier
+              </Button>
             </div>
           </div>
         </header>
@@ -405,91 +366,72 @@ export default function SuppliersPage() {
           </div>
         ) : (
           <>
-            <section className="hidden overflow-hidden rounded-xl border border-border bg-card shadow-sm md:block">
+            <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-3xl font-semibold text-gray-900">Registered Suppliers</h2>
+                  <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700">
+                    {filteredSuppliers.length}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button type="button" variant="outline" size="sm" className="border-gray-200 bg-white text-gray-600">Filter</Button>
+                  <Button type="button" variant="outline" size="sm" className="border-gray-200 bg-white text-gray-600">Export</Button>
+                </div>
+              </div>
+
+              <div className="hidden overflow-hidden rounded-lg border border-gray-200 md:block">
               <table className="w-full text-sm">
-                <thead className="bg-background text-[0.65rem] uppercase tracking-[0.2em] text-muted-foreground">
+                <thead className="bg-gray-50 text-[0.65rem] uppercase tracking-[0.12em] text-gray-500">
                   <tr>
+                    <th className="px-6 py-4 text-left font-semibold">#</th>
                     <th className="px-6 py-4 text-left font-semibold">Supplier</th>
-                    <th className="px-6 py-4 text-left font-semibold">Behavior</th>
+                    <th className="px-6 py-4 text-left font-semibold">Status</th>
+                    <th className="px-6 py-4 text-left font-semibold">Mock Behavior</th>
                     <th className="px-6 py-4 text-left font-semibold">Timeout</th>
-                    <th className="px-6 py-4 text-left font-semibold">Order</th>
-                    <th className="px-6 py-4 text-left font-semibold">Active</th>
                     <th className="px-6 py-4 text-left font-semibold">Created</th>
                     <th className="px-6 py-4 text-left font-semibold">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border">
-                  {pagedSuppliers.map((supplier) => {
+                <tbody className="divide-y divide-gray-200">
+                  {pagedSuppliers.map((supplier, index) => {
                     const isUpdating = !!updating[supplier.id];
                     const behaviorLabel = behaviorLabels[supplier.mock_behavior] ?? supplier.mock_behavior;
-                    const isEditingOrder = editingOrderId === supplier.id;
-                    const isSavingOrder = savingOrderId === supplier.id;
 
                     return (
-                      <tr key={supplier.id} className="text-foreground">
+                      <tr key={supplier.id} className="text-gray-800">
+                        <td className="px-6 py-5 text-sm text-gray-600">{(page - 1) * pageSize + index + 1}</td>
                         <td className="px-6 py-5">
                           <div>
-                            <p className="text-sm font-semibold text-foreground">{supplier.name}</p>
+                            <p className="text-sm font-semibold text-gray-900">{supplier.name}</p>
                             {supplier.description ? (
-                              <p className="mt-1 text-xs text-muted-foreground">
+                              <p className="mt-1 text-xs text-gray-500">
                                 {supplier.description}
                               </p>
                             ) : null}
                           </div>
                         </td>
                         <td className="px-6 py-5">
-                          <Badge variant="secondary">{behaviorLabel}</Badge>
-                        </td>
-                        <td className="px-6 py-5 text-muted-foreground">{supplier.timeout_ms} ms</td>
-                        <td className="px-6 py-5 text-muted-foreground">
-                          {isEditingOrder ? (
-                            <input
-                              type="number"
-                              min={0}
-                              className="w-20 rounded-md border border-border px-2 py-1 text-sm text-foreground"
-                              value={editingOrderValue}
-                              onChange={(event) => setEditingOrderValue(event.target.value)}
-                              onBlur={() => commitOrderEdit(supplier)}
-                              onKeyDown={(event) => {
-                                if (event.key === "Enter") {
-                                  event.preventDefault();
-                                  commitOrderEdit(supplier);
-                                }
-                                if (event.key === "Escape") {
-                                  cancelOrderEdit();
-                                }
-                              }}
-                              disabled={isSavingOrder}
-                            />
-                          ) : (
-                            <button
-                              type="button"
-                              className="text-left text-sm text-muted-foreground hover:text-foreground"
-                              onClick={() => startOrderEdit(supplier)}
-                            >
-                              {supplier.display_order}
-                            </button>
-                          )}
-                        </td>
-                        <td className="px-6 py-5">
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-2">
                             <Switch
                               checked={supplier.is_active}
                               onCheckedChange={() => handleToggle(supplier)}
                               disabled={isUpdating}
                               aria-label={`Toggle ${supplier.name}`}
                             />
-                            <span className="text-xs text-muted-foreground">
+                            <span className={`text-sm ${supplier.is_active ? "text-green-600" : "text-gray-500"}`}>
                               {supplier.is_active ? "Active" : "Inactive"}
                             </span>
                           </div>
                         </td>
-                        <td className="px-6 py-5 text-muted-foreground">
-                          {formatDate(supplier.created_at)}
+                        <td className="px-6 py-5">
+                          <Badge variant="secondary">{behaviorLabel}</Badge>
                         </td>
+                        <td className="px-6 py-5 text-gray-700">{supplier.timeout_ms.toLocaleString("id-ID")} ms</td>
+                        <td className="px-6 py-5 text-gray-700">{formatDate(supplier.created_at)}</td>
                         <td className="px-6 py-5">
                           <div className="flex items-center gap-2">
-                            <Button type="button" variant="outline" size="sm" onClick={() => openEditForm(supplier)}>
+                            <Button type="button" variant="outline" size="sm" className="border-gray-200" onClick={() => openEditForm(supplier)}>
                               Edit
                             </Button>
                             <Button
@@ -507,15 +449,17 @@ export default function SuppliersPage() {
                   })}
                 </tbody>
               </table>
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-card px-6 py-4 text-sm text-muted-foreground">
+              </div>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3 px-2 text-sm text-gray-500">
                 <span>
-                  Page {page} of {totalPages}
+                  Showing {pagedSuppliers.length} of {filteredSuppliers.length} suppliers
                 </span>
                 <div className="flex items-center gap-2">
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
+                    className="border-gray-200 bg-white"
                     onClick={() => setPage((prev) => Math.max(1, prev - 1))}
                     disabled={page === 1}
                   >
@@ -525,6 +469,7 @@ export default function SuppliersPage() {
                     type="button"
                     variant="outline"
                     size="sm"
+                    className="border-gray-200 bg-white"
                     onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
                     disabled={page === totalPages}
                   >
@@ -629,7 +574,7 @@ export default function SuppliersPage() {
 
       {isFormOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6">
-          <div className="w-full max-w-2xl rounded-xl bg-card p-6 shadow-lg">
+          <div className="w-full max-w-2xl rounded-xl border border-white/40 bg-white/75 p-6 shadow-lg backdrop-blur-sm">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">

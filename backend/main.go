@@ -26,8 +26,6 @@ func main() {
 	// Load configuration
 	cfg := config.LoadConfig()
 
-	fmt.Printf ("database URL: %s\n", cfg.DatabaseURL)
-
 	// initialize database connection
 	pool, err := db.InitDB(cfg.DatabaseURL)
 	if err != nil {

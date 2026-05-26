@@ -48,6 +48,8 @@ export default function Dashboard() {
 
   const isFetchingRef = useRef(false);
   const isMountedRef = useRef(true);
+  const autoRefreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const hasLoadedOnceRef = useRef(false);
 
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -58,6 +60,7 @@ export default function Dashboard() {
   useEffect(() => {
     return () => {
       isMountedRef.current = false;
+      if (autoRefreshTimerRef.current) clearInterval(autoRefreshTimerRef.current);
     };
   }, []);
 
@@ -65,7 +68,7 @@ export default function Dashboard() {
     async (options?: { silent?: boolean }) => {
       if (isFetchingRef.current) return;
 
-      const isInitial = !data;
+      const isInitial = !hasLoadedOnceRef.current;
       isFetchingRef.current = true;
 
       if (isInitial) {
@@ -101,10 +104,11 @@ export default function Dashboard() {
           setIsLoading(false);
           setIsRefreshing(false);
         }
+        hasLoadedOnceRef.current = true;
         isFetchingRef.current = false;
       }
     },
-    [data]
+    []
   );
 
   useEffect(() => {
@@ -112,9 +116,23 @@ export default function Dashboard() {
   }, [loadStock]);
 
   useEffect(() => {
+    if (autoRefreshTimerRef.current) {
+      clearInterval(autoRefreshTimerRef.current);
+      autoRefreshTimerRef.current = null;
+    }
+
     if (!autoRefresh) return;
-    const intervalId = setInterval(() => loadStock({ silent: true }), 30000);
-    return () => clearInterval(intervalId);
+
+    autoRefreshTimerRef.current = setInterval(() => {
+      loadStock({ silent: true });
+    }, 30000);
+
+    return () => {
+      if (autoRefreshTimerRef.current) {
+        clearInterval(autoRefreshTimerRef.current);
+        autoRefreshTimerRef.current = null;
+      }
+    };
   }, [autoRefresh, loadStock]);
 
   useEffect(() => {
@@ -134,6 +152,10 @@ export default function Dashboard() {
     frameId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frameId);
   }, [data]);
+
+  const handleSyncNow = () => {
+    loadStock();
+  };
 
   if (isLoading && !data) {
     return (
@@ -176,17 +198,36 @@ export default function Dashboard() {
           <h1 className="text-3xl font-semibold text-blue-700">Dashboard</h1>
 
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5">
-              <span className="text-xs text-gray-500">Auto-refresh</span>
+            <div
+              className={`flex items-center gap-2 rounded-full border px-3 py-1.5 transition-colors ${
+                autoRefresh ? "border-blue-200 bg-blue-50" : "border-gray-200 bg-gray-100"
+              }`}
+            >
+              <span className={`text-xs ${autoRefresh ? "text-blue-700" : "text-gray-600"}`}>
+                Auto-refresh
+              </span>
               <Switch checked={autoRefresh} onCheckedChange={setAutoRefresh} />
             </div>
 
             <Button
               type="button"
-              onClick={() => loadStock()}
+              onClick={handleSyncNow}
               disabled={isRefreshing}
-              className="h-8 rounded-md bg-blue-600 px-3 text-xs font-medium text-white hover:bg-blue-700"
+              className="h-8 rounded-md border border-blue-600 bg-white px-3 text-xs font-medium text-blue-600 hover:bg-blue-50"
             >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                className={`mr-1.5 h-3.5 w-3.5 text-blue-600 ${isRefreshing ? "animate-spin" : ""}`}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M21 12a9 9 0 1 1-3.2-6.9" />
+                <path d="M21 4v6h-6" />
+              </svg>
               {isRefreshing ? "Syncing..." : "Sync All"}
             </Button>
           </div>
@@ -197,7 +238,9 @@ export default function Dashboard() {
           <div className="mt-3 flex flex-wrap items-end gap-3">
             <p className="font-serif text-6xl leading-none text-gray-900">{totalStock}</p>
             <div className="pb-2 text-sm text-gray-600">
-              <p>{successSources} of {totalSources} sources online</p>
+              <p>
+                {successSources} of {totalSources} sources online
+              </p>
               <p className="text-xs text-gray-400">Last synced {lastSyncedLabel}</p>
             </div>
           </div>
@@ -205,10 +248,7 @@ export default function Dashboard() {
 
         <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {suppliers.map((supplier) => (
-            <SupplierCard
-              key={supplier.supplier_id}
-              supplier={{ ...supplier, status: toSupplierStatus(supplier.status) }}
-            />
+            <SupplierCard key={supplier.supplier_id} supplier={{ ...supplier, status: toSupplierStatus(supplier.status) }} />
           ))}
         </section>
 
@@ -230,7 +270,9 @@ export default function Dashboard() {
           </div>
 
           <p className="mt-3 text-xs text-gray-400">Sync throughput averaged 14.2 MB/s over last 24h.</p>
-          {failedSources > 0 ? <p className="mt-2 text-xs text-red-500">{failedSources} source(s) need attention.</p> : null}
+          {failedSources > 0 ? (
+            <p className="mt-2 text-xs text-red-500">{failedSources} source(s) need attention.</p>
+          ) : null}
         </section>
       </div>
     </main>
