@@ -3,8 +3,9 @@ package repository
 import (
 	"backend/internal/models"
 	"context"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"fmt"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type SupplierRepository interface {
@@ -21,7 +22,6 @@ type SupplierRepository interface {
 
 var _ SupplierRepository = (*postgresSupplierRepository)(nil)
 
-
 type postgresSupplierRepository struct {
 	db *pgxpool.Pool
 }
@@ -29,7 +29,6 @@ type postgresSupplierRepository struct {
 func NewSupplierRepository(db *pgxpool.Pool) SupplierRepository {
 	return &postgresSupplierRepository{db: db}
 }
-
 
 func (r *postgresSupplierRepository) GetActiveSuppliers(ctx context.Context) ([]models.Supplier, error) {
 	query := `
@@ -59,11 +58,12 @@ func (r *postgresSupplierRepository) GetActiveSuppliers(ctx context.Context) ([]
 	return suppliers, nil
 }
 
-func (r *postgresSupplierRepository) GetAllSuppliers(ctx context.Context) ([]models.Supplier, error) {
+func (r *postgresSupplierRepository) GetAllSuppliers(ctx context.Context, search string, page int, limit int) ([]models.Supplier, error) {
 	query := `
 		SELECT id, name, description, endpoint_url, auth_type, auth_token,
 				timeout_ms, is_active, mock_behavior, display_order, created_at, updated_at
 		FROM suppliers
+		WHERE deleted_at IS NULL
 		ORDER BY display_order ASC, created_at ASC
 	`
 	rows, err := r.db.Query(ctx, query)
@@ -114,7 +114,7 @@ func (r *postgresSupplierRepository) GetByID(ctx context.Context, id string) (mo
 		SELECT id, name, description, endpoint_url, auth_type, auth_token,
 				timeout_ms, is_active, mock_behavior, display_order, created_at, updated_at
 		FROM suppliers
-		WHERE id = $1
+		WHERE id = $1 AND deleted_at IS NULL
 	`
 	var s models.Supplier
 	err := r.db.QueryRow(ctx, query, id).Scan(
@@ -128,7 +128,7 @@ func (r *postgresSupplierRepository) GetByID(ctx context.Context, id string) (mo
 }
 
 func (r *postgresSupplierRepository) Delete(ctx context.Context, id string) error {
-	query := `DELETE FROM suppliers WHERE id = $1`
+	query := `UPDATE suppliers SET deleted_at = now() WHERE id = $1 AND deleted_at IS NULL`
 	_, err := r.db.Exec(ctx, query, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete supplier: %w", err)
@@ -157,7 +157,8 @@ func (r *postgresSupplierRepository) Update(ctx context.Context, req models.Supp
 		UPDATE suppliers
 		SET name = $1, description = $2, endpoint_url = $3, auth_type = $4, auth_token = $5,
 			timeout_ms = $6, mock_behavior = $7, display_order = $8
-		WHERE id = $9
+		WHERE id = $9 AND deleted_at IS NULL
+		RETURNING id
 	`
 	_, err := r.db.Exec(ctx, query,
 		req.Name, req.Description, req.EndpointURL, req.AuthType, req.AuthToken,
