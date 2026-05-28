@@ -144,7 +144,7 @@ export default function SuppliersPage() {
     () => Math.max(1, Math.ceil(filteredSuppliers.length / pageSize)),
     [filteredSuppliers.length]
   );
-  
+
   const pagedSuppliers = useMemo(() => {
     const start = (page - 1) * pageSize;
     return filteredSuppliers.slice(start, start + pageSize);
@@ -303,14 +303,14 @@ export default function SuppliersPage() {
   return (
     <main className="min-h-screen bg-[#FAFAFA] p-6 lg:p-8">
       <div className="mx-auto max-w-6xl space-y-6">
-        
+
         {/* Header Section (Section 3.1 app shell layout) */}
         <header className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-200 pb-5">
           <div>
             <h1 className="text-[28px] font-medium tracking-tight text-zinc-900 font-display">Supplier Management</h1>
             <p className="mt-0.5 text-sm text-zinc-500 font-body">Manage and aggregate your active inventory sources</p>
           </div>
-          
+
           <div className="flex items-center gap-3">
             {/* Search Input */}
             <div className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-1.8 focus-within:ring-2 focus-within:ring-blue-100 focus-within:border-blue-500 transition-all duration-150">
@@ -325,7 +325,7 @@ export default function SuppliersPage() {
                 className="w-40 bg-transparent text-sm text-zinc-700 outline-none placeholder:text-zinc-400 font-body font-medium"
               />
             </div>
-            
+
             {/* Add Supplier Button (zinc-900 default button class) */}
             <Button type="button" onClick={openCreateForm} className="h-9 rounded-lg bg-zinc-900 hover:bg-zinc-700 text-white px-4 text-xs font-semibold shadow-sm transition-colors duration-150 font-body">
               + Add Supplier
@@ -515,7 +515,7 @@ export default function SuppliersPage() {
                             <p className="mt-0.5 text-xs text-zinc-450 font-body leading-relaxed">{supplier.description}</p>
                           ) : null}
                         </div>
-                        
+
                         {supplier.mock_behavior === "success" && (
                           <span className="inline-flex items-center gap-1 rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-[10px] font-semibold text-green-700">
                             Success
@@ -537,7 +537,7 @@ export default function SuppliersPage() {
                           </Badge>
                         )}
                       </div>
-                      
+
                       <div className="grid grid-cols-2 gap-2 text-xs font-body text-zinc-500 pt-1">
                         <div>
                           <span className="text-zinc-400">Timeout: </span>
@@ -598,7 +598,7 @@ export default function SuppliersPage() {
                   >
                     Previous
                   </Button>
-                  
+
                   {/* Page numbers (Section 5.8 active page: bg-zinc-900) */}
                   <div className="flex gap-1">
                     {Array.from({ length: totalPages }).map((_, idx) => {
@@ -608,11 +608,10 @@ export default function SuppliersPage() {
                         <button
                           key={p}
                           onClick={() => setPage(p)}
-                          className={`h-8 w-8 rounded-lg text-xs font-semibold transition-all duration-150 ${
-                            isCurrent
-                              ? "bg-zinc-900 text-white shadow-sm"
-                              : "border border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50"
-                          }`}
+                          className={`h-8 w-8 rounded-lg text-xs font-semibold transition-all duration-150 ${isCurrent
+                            ? "bg-zinc-900 text-white shadow-sm"
+                            : "border border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50"
+                            }`}
                         >
                           {p}
                         </button>
@@ -653,7 +652,7 @@ export default function SuppliersPage() {
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4 py-6 transition-all duration-300 animate-in fade-in">
             <div className="relative w-full max-w-[560px] max-h-[95vh] overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-6 shadow-[0_4px_6px_rgba(0,0,0,0.05),0_10px_15px_rgba(0,0,0,0.08)] animate-in zoom-in-95 duration-200">
-              
+
               {/* Header */}
               <div className="relative flex items-start justify-between">
                 <div>
@@ -691,9 +690,8 @@ export default function SuppliersPage() {
                     <input
                       type="text"
                       placeholder="e.g. Tokopedia Official Store"
-                      className={`w-full h-9 rounded-lg border bg-white px-3 text-sm text-zinc-900 outline-none transition-colors duration-150 font-body ${
-                        formErrors.name ? "border-red-400 focus:ring-2 focus:ring-red-100" : "border-zinc-200 focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400"
-                      }`}
+                      className={`w-full h-9 rounded-lg border bg-white px-3 text-sm text-zinc-900 outline-none transition-colors duration-150 font-body ${formErrors.name ? "border-red-400 focus:ring-2 focus:ring-red-100" : "border-zinc-200 focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400"
+                        }`}
                       value={formState.name}
                       onChange={(event) =>
                         setFormState((prev) => ({ ...prev, name: event.target.value }))
@@ -754,9 +752,8 @@ export default function SuppliersPage() {
                   <input
                     type="url"
                     placeholder="https://api.supplier.com/stock"
-                    className={`w-full h-9 rounded-lg border bg-white px-3 text-sm text-zinc-900 outline-none transition-colors duration-150 font-body ${
-                      formErrors.endpoint_url ? "border-red-400 focus:ring-2 focus:ring-red-100" : "border-zinc-200 focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400"
-                    }`}
+                    className={`w-full h-9 rounded-lg border bg-white px-3 text-sm text-zinc-900 outline-none transition-colors duration-150 font-body ${formErrors.endpoint_url ? "border-red-400 focus:ring-2 focus:ring-red-100" : "border-zinc-200 focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400"
+                      }`}
                     value={formState.endpoint_url}
                     onChange={(event) =>
                       setFormState((prev) => ({ ...prev, endpoint_url: event.target.value }))
@@ -854,25 +851,6 @@ export default function SuppliersPage() {
                       <span>10,000 ms</span>
                     </div>
                   </div>
-
-                  {/* Active Switch */}
-                  <div className="space-y-2">
-                    <label className="text-xs font-semibold text-zinc-700 font-body block">
-                      Supplier Active State
-                    </label>
-                    <div className="flex items-center gap-3 rounded-lg border border-zinc-200 bg-zinc-50/50 px-3.5 h-9">
-                      <Switch
-                        checked={formState.is_active}
-                        onCheckedChange={(checked) =>
-                          setFormState((prev) => ({ ...prev, is_active: checked }))
-                        }
-                        checkedClass="bg-green-500 border-green-500"
-                      />
-                      <span className="text-xs font-semibold text-zinc-500 font-body">
-                        {formState.is_active ? "Enabled" : "Disabled"}
-                      </span>
-                    </div>
-                  </div>
                 </div>
 
                 <div className="my-2 border-b border-zinc-100" />
@@ -906,7 +884,7 @@ export default function SuppliersPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4 py-6 transition-all duration-300 animate-in fade-in">
           <div className="relative w-full max-w-[400px] rounded-2xl border border-zinc-200 bg-white p-6 shadow-[0_4px_6px_rgba(0,0,0,0.05),0_10px_15px_rgba(0,0,0,0.08)] animate-in zoom-in-95 duration-200">
             <div className="relative flex flex-col items-center text-center">
-              
+
               {/* Top Red Trash Icon Container */}
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-50 border border-red-200 text-red-600 mb-4">
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
