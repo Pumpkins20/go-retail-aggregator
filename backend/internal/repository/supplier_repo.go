@@ -9,7 +9,7 @@ import (
 )
 
 type SupplierRepository interface {
-	GetAllSuppliers(ctx context.Context) ([]models.Supplier, error)
+	GetAllSuppliers(ctx context.Context, search string, page int, limit int) ([]models.Supplier, error)
 	GetActiveSuppliers(ctx context.Context) ([]models.Supplier, error)
 	ExistsbyName(ctx context.Context, name string) (bool, error)
 	CountActiveSuppliers(ctx context.Context) (int, error)
@@ -35,7 +35,7 @@ func (r *postgresSupplierRepository) GetActiveSuppliers(ctx context.Context) ([]
 		SELECT id, name, description, endpoint_url, auth_type, auth_token,
 				timeout_ms, is_active, mock_behavior, display_order, created_at, updated_at
 		FROM suppliers
-		WHERE is_active = true
+		WHERE is_active = true AND deleted_at IS NULL
 		ORDER BY display_order ASC
 	`
 	rows, err := r.db.Query(ctx, query)
@@ -59,6 +59,7 @@ func (r *postgresSupplierRepository) GetActiveSuppliers(ctx context.Context) ([]
 }
 
 func (r *postgresSupplierRepository) GetAllSuppliers(ctx context.Context, search string, page int, limit int) ([]models.Supplier, error) {
+
 	query := `
 		SELECT id, name, description, endpoint_url, auth_type, auth_token,
 				timeout_ms, is_active, mock_behavior, display_order, created_at, updated_at
@@ -88,7 +89,7 @@ func (r *postgresSupplierRepository) GetAllSuppliers(ctx context.Context, search
 
 // checking if supplier name already exists (case-insensitive)
 func (r *postgresSupplierRepository) ExistsbyName(ctx context.Context, name string) (bool, error) {
-	query := `SELECT EXISTS (SELECT 1 FROM suppliers WHERE LOWER(name) = LOWER($1))`
+	query := `SELECT EXISTS (SELECT 1 FROM suppliers WHERE LOWER(name) = LOWER($1) AND deleted_at IS NULL)`
 	var exists bool
 	err := r.db.QueryRow(ctx, query, name).Scan(&exists)
 	if err != nil {
@@ -99,7 +100,7 @@ func (r *postgresSupplierRepository) ExistsbyName(ctx context.Context, name stri
 
 // counting active suppliers
 func (r *postgresSupplierRepository) CountActiveSuppliers(ctx context.Context) (int, error) {
-	query := `SELECT COUNT(*) FROM suppliers WHERE is_active = true`
+	query := `SELECT COUNT(*) FROM suppliers WHERE is_active = true AND deleted_at IS NULL`
 	var count int
 	err := r.db.QueryRow(ctx, query).Scan(&count)
 	if err != nil {
@@ -171,7 +172,7 @@ func (r *postgresSupplierRepository) Update(ctx context.Context, req models.Supp
 }
 
 func (r *postgresSupplierRepository) ToggleActiveStatus(ctx context.Context, id string, isActive bool) error {
-	query := `UPDATE suppliers SET is_active = $1 WHERE id = $2`
+	query := `UPDATE suppliers SET is_active = $1 WHERE id = $2 AND deleted_at IS NULL`
 	_, err := r.db.Exec(ctx, query, isActive, id)
 	if err != nil {
 		return fmt.Errorf("failed to toggle supplier active status: %w", err)
