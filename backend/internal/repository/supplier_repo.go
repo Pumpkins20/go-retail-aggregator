@@ -9,7 +9,7 @@ import (
 )
 
 type SupplierRepository interface {
-	GetAllSuppliers(ctx context.Context, search string, page int, limit int) ([]models.Supplier, error)
+	GetAllSuppliers(ctx context.Context, search string, page int, limit int) ([]models.Supplier, int, error)
 	GetActiveSuppliers(ctx context.Context) ([]models.Supplier, error)
 	ExistsbyName(ctx context.Context, name string) (bool, error)
 	CountActiveSuppliers(ctx context.Context) (int, error)
@@ -58,18 +58,35 @@ func (r *postgresSupplierRepository) GetActiveSuppliers(ctx context.Context) ([]
 	return suppliers, nil
 }
 
-func (r *postgresSupplierRepository) GetAllSuppliers(ctx context.Context, search string, page int, limit int) ([]models.Supplier, error) {
+func (r *postgresSupplierRepository) GetAllSuppliers(ctx context.Context, search string, page int, limit int) ([]models.Supplier, int, error) {
+	offset := (page - 1) * limit
+
+	searchTerm := "%" + search + "%"
+
+	var totalRows int
+	countQuery := `
+		SELECT COUNT(id)
+		FROM suppliers 
+		WHERE deleted_at IS NULL 
+		AND (name ILIKE $1 OR description ILIKE $1)
+	`
+	err := r.db.QueryRow(ctx, countQuery, searchTerm).Scan(&totalRows)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to count suppliers: %w", err)
+	}
 
 	query := `
 		SELECT id, name, description, endpoint_url, auth_type, auth_token,
 				timeout_ms, is_active, mock_behavior, display_order, created_at, updated_at
 		FROM suppliers
 		WHERE deleted_at IS NULL
+		AND (name ILIKE $1 OR description ILIKE $1)
 		ORDER BY display_order ASC, created_at ASC
+		LIMIT $2 OFFSET $3
 	`
-	rows, err := r.db.Query(ctx, query)
+	rows, err := r.db.Query(ctx, query, searchTerm, limit, offset)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query suppliers: %w", err)
+		return nil, 0, fmt.Errorf("failed to query suppliers: %w", err)
 	}
 	defer rows.Close()
 
@@ -80,11 +97,11 @@ func (r *postgresSupplierRepository) GetAllSuppliers(ctx context.Context, search
 			&s.ID, &s.Name, &s.Description, &s.EndpointURL, &s.AuthType, &s.AuthToken,
 			&s.TimeoutMs, &s.IsActive, &s.MockBehavior, &s.DisplayOrder, &s.CreatedAt, &s.UpdatedAt,
 		); err != nil {
-			return nil, fmt.Errorf("failed to scan supplier: %w", err)
+			return nil, 0, fmt.Errorf("failed to scan supplier: %w", err)
 		}
 		suppliers = append(suppliers, s)
 	}
-	return suppliers, nil
+	return suppliers, totalRows, nil
 }
 
 // checking if supplier name already exists (case-insensitive)

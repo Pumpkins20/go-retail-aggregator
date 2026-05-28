@@ -1,10 +1,10 @@
 package services
 
 import (
-	"errors"
 	"backend/internal/models"
 	"backend/internal/repository"
 	"context"
+	"errors"
 	"strings"
 )
 
@@ -21,8 +21,8 @@ func NewSupplierService(repo repository.SupplierRepository) *SupplierService {
 	return &SupplierService{repo: repo}
 }
 
-func (s *SupplierService) ListSuppliers(ctx context.Context) ([]models.Supplier, error) {
-	return s.repo.GetAllSuppliers(ctx)
+func (s *SupplierService) ListSuppliers(ctx context.Context, search string, page int, limit int) ([]models.Supplier, int, error) {
+	return s.repo.GetAllSuppliers(ctx, search, page, limit)
 }
 
 // Rule 1: Supplier names must be unique (case-insensitive)
@@ -32,10 +32,10 @@ func (s *SupplierService) CreateSupplier(ctx context.Context, req models.Supplie
 	if err != nil {
 		return err
 	}
-	
+
 	if existing {
 		return ErrSupplierNameExists
-	}	
+	}
 
 	return s.repo.Create(ctx, req)
 }

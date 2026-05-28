@@ -1,9 +1,11 @@
 package handlers
 
 import (
-	"errors"
 	"encoding/json"
+	"errors"
+	"math"
 	"net/http"
+	"strconv"
 
 	"backend/internal/models"
 	"backend/internal/services"
@@ -17,12 +19,12 @@ func NewSupplierHandler(service *services.SupplierService) *SupplierHandler {
 	return &SupplierHandler{service: service}
 }
 
-func WriteError (w http.ResponseWriter, statusCode int,code string, message string) {
+func WriteError(w http.ResponseWriter, statusCode int, code string, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"error" : map[string]string{
-			"code": code,
+		"error": map[string]string{
+			"code":    code,
 			"message": message,
 		},
 	})
@@ -55,15 +57,39 @@ func (h *SupplierHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *SupplierHandler) List(w http.ResponseWriter, r *http.Request) {
-	suppliers, err := h.service.ListSuppliers(r.Context())
+	search := r.URL.Query().Get("search")
+	pageStr := r.URL.Query().Get("page")
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page < 1 {
+		page = 1
+	}
+	limitStr := r.URL.Query().Get("limit")
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit < 1 {
+		limit = 20
+	}
+
+	suppliers, totalRows, err := h.service.ListSuppliers(r.Context(), search, page, limit)
 	if err != nil {
 		WriteError(w, http.StatusInternalServerError, "InternalError", "Failed to fetch suppliers")
 		return
 	}
 
+	totalPages := int(math.Ceil(float64(totalRows) / float64(limit)))
+
+	response := map[string]interface{}{
+		"data": suppliers,
+		"meta": map[string]interface{}{
+			"current_page": page,
+			"limit":        limit,
+			"total_rows":   totalRows,
+			"total_pages":  totalPages,
+		},
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(suppliers)
+	json.NewEncoder(w).Encode(response)
 }
 
 func (h *SupplierHandler) Delete(w http.ResponseWriter, r *http.Request) {
