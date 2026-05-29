@@ -99,3 +99,7 @@ func (s *SupplierService) ToggleActiveStatus(ctx context.Context, id string, isA
 
 	return s.repo.ToggleActiveStatus(ctx, id, !supplier.IsActive)
 }
+
+func (s *SupplierService) ExportSuppliersCSV(ctx context.Context, search string) ([]models.Supplier, error) {
+	return s.repo.GetAllSuppliersForExport(ctx, search)
+}

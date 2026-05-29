@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"math"
@@ -166,4 +167,53 @@ func (h *SupplierHandler) Toggle(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"message": "Supplier status updated",
 	})
+}
+
+func (h *SupplierHandler) ExportCSV(w http.ResponseWriter, r *http.Request) {
+	search := r.URL.Query().Get("search")
+
+	suppliers, err := h.service.ExportSuppliersCSV(r.Context(), search)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "InternalError", "Failed to fetch suppliers for export")
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/csv")
+	w.Header().Set("Content-Disposition", "attachment;filename=suppliers.csv")
+
+	writer := csv.NewWriter(w)
+	defer writer.Flush()
+
+	header := []string{"ID", "Nama Supplier", "Deskripsi", "Endpoint URL", "Tipe Auth", "Timeout (ms)", "Status", "Mock Behavior", "Urutan Tampilan"}
+	if err := writer.Write(header); err != nil {
+		WriteError(w, http.StatusInternalServerError, "InternalError", "Failed to write CSV header")
+		return
+	}
+
+	for _, s := range suppliers {
+		description := "-"
+		if s.Description != nil {
+			description = *s.Description
+		}
+
+		status := "Inactive"
+		if s.IsActive {
+			status = "Active"
+		}
+		row := []string{
+			s.ID.String(),
+			s.Name,
+			description,
+			s.EndpointURL,
+			s.AuthType,
+			strconv.Itoa(s.TimeoutMs),
+			status,
+			s.MockBehavior,
+			strconv.Itoa(s.DisplayOrder),
+		}
+		if err := writer.Write(row); err != nil {
+			WriteError(w, http.StatusInternalServerError, "InternalError", "Failed to write CSV row")
+			return
+		}
+	}
 }

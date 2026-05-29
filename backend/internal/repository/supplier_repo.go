@@ -10,6 +10,7 @@ import (
 
 type SupplierRepository interface {
 	GetAllSuppliers(ctx context.Context, search string, page int, limit int) ([]models.Supplier, int, error)
+	GetAllSuppliersForExport(ctx context.Context, search string) ([]models.Supplier, error)
 	GetActiveSuppliers(ctx context.Context) ([]models.Supplier, error)
 	ExistsbyName(ctx context.Context, name string) (bool, error)
 	CountActiveSuppliers(ctx context.Context) (int, error)
@@ -102,6 +103,35 @@ func (r *postgresSupplierRepository) GetAllSuppliers(ctx context.Context, search
 		suppliers = append(suppliers, s)
 	}
 	return suppliers, totalRows, nil
+}
+
+func (r *postgresSupplierRepository) GetAllSuppliersForExport(ctx context.Context, search string) ([]models.Supplier, error) {
+	searchTerm := "%" + search + "%"
+	query := `
+		SELECT id, name, description, endpoint_url, auth_type, auth_token,
+				timeout_ms, is_active, mock_behavior, display_order, created_at, updated_at
+		FROM suppliers
+		WHERE deleted_at IS NULL
+		AND (name ILIKE $1 OR description ILIKE $1)
+		ORDER BY display_order ASC, created_at ASC
+	`
+	rows, err := r.db.Query(ctx, query, searchTerm)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query suppliers for export: %w", err)
+	}
+	defer rows.Close()
+	var suppliers []models.Supplier
+	for rows.Next() {
+		var s models.Supplier
+		if err := rows.Scan(
+			&s.ID, &s.Name, &s.Description, &s.EndpointURL, &s.AuthType, &s.AuthToken,
+			&s.TimeoutMs, &s.IsActive, &s.MockBehavior, &s.DisplayOrder, &s.CreatedAt, &s.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan supplier for export: %w", err)
+		}
+		suppliers = append(suppliers, s)
+	}
+	return suppliers, nil
 }
 
 // checking if supplier name already exists (case-insensitive)

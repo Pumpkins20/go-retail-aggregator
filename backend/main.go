@@ -1,23 +1,23 @@
 package main
 
 import (
+	"backend/internal/config"
+	"backend/internal/db"
+	"backend/internal/engine"
+	"backend/internal/fetcher"
 	"backend/internal/handlers"
+	"backend/internal/middleware"
 	"backend/internal/repository"
 	"backend/internal/services"
-	"backend/internal/engine"
-	"backend/internal/db"
-	"backend/internal/fetcher"
-	"backend/internal/middleware"
-	"backend/internal/config"
 
 	"context"
-	"os"
+	"fmt"
 	"log"
+	"net/http"
+	"os"
 	"os/signal"
 	"syscall"
 	"time"
-	"fmt"
-	"net/http"
 )
 
 func main() {
@@ -49,10 +49,10 @@ func main() {
 	supplierHandler := handlers.NewSupplierHandler(supplierService)
 	stockHandler := handlers.NewStockHandler(stockService)
 
-
 	// setup HTTP server and routes
 	mux := http.NewServeMux()
 
+	mux.HandleFunc("GET /api/v1/suppliers/export", supplierHandler.ExportCSV)
 	mux.HandleFunc("GET /api/v1/suppliers", supplierHandler.List)
 	mux.HandleFunc("POST /api/v1/suppliers", supplierHandler.Create)
 	mux.HandleFunc("PUT /api/v1/suppliers/{id}", supplierHandler.Update)
@@ -100,7 +100,3 @@ func main() {
 	}
 	fmt.Println("Server gracefully stopped")
 }
-
-
-
-
