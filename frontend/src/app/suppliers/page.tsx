@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -11,11 +11,12 @@ import {
   ApiClientError,
   createSupplier,
   deleteSupplier,
+  getExportCSVUrl,
   getSuppliers,
   toggleSupplier,
   updateSupplier,
 } from "@/lib/api";
-import type { Supplier, SupplierPayload } from "@/types";
+import type { PaginationMeta, Supplier, SupplierPayload } from "@/types";
 
 interface UiError {
   code?: string;
@@ -37,7 +38,7 @@ type SupplierFormState = {
 
 type FormErrors = Partial<Record<keyof SupplierFormState, string>>;
 
-const pageSize = 20;
+const PAGE_SIZE = 20;
 
 const behaviorLabels: Record<string, string> = {
   success: "Success",
@@ -112,9 +113,41 @@ function validateForm(values: SupplierFormState): FormErrors {
   return errors;
 }
 
+// ---------------------------------------------------------------------------
+// Custom hook: useDebounce
+// ---------------------------------------------------------------------------
+function useDebounce<T>(value: T, delayMs: number): T {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedValue(value), delayMs);
+    return () => clearTimeout(timer);
+  }, [value, delayMs]);
+
+  return debouncedValue;
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
 export default function SuppliersPage() {
+  // --- Data state ---
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [meta, setMeta] = useState<PaginationMeta>({
+    current_page: 1,
+    limit: PAGE_SIZE,
+    total_rows: 0,
+    total_pages: 1,
+  });
+
+  // --- Search with debounce ---
+  const [searchInput, setSearchInput] = useState("");
+  const debouncedSearch = useDebounce(searchInput, 400);
+
+  // --- Pagination ---
+  const [page, setPage] = useState(1);
+
+  // --- UI state ---
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<UiError | null>(null);
   const [updating, setUpdating] = useState<Record<string, boolean>>({});
@@ -126,29 +159,8 @@ export default function SuppliersPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Supplier | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [page, setPage] = useState(1);
+  const [isExporting, setIsExporting] = useState(false);
   const isMountedRef = useRef(true);
-
-  const filteredSuppliers = useMemo(() => {
-    if (!searchQuery.trim()) return suppliers;
-    const q = searchQuery.toLowerCase();
-    return suppliers.filter((supplier) => {
-      return (
-        supplier.name.toLowerCase().includes(q) ||
-        (supplier.description ?? "").toLowerCase().includes(q)
-      );
-    });
-  }, [searchQuery, suppliers]);
-
-  const totalPages = useMemo(
-    () => Math.max(1, Math.ceil(filteredSuppliers.length / pageSize)),
-    [filteredSuppliers.length]
-  );
-
-  const pagedSuppliers = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filteredSuppliers.slice(start, start + pageSize);
-  }, [filteredSuppliers, page]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -157,45 +169,62 @@ export default function SuppliersPage() {
     };
   }, []);
 
+  // Reset to page 1 whenever debounced search changes
   useEffect(() => {
-    if (page > totalPages) {
-      setPage(totalPages);
-    }
-  }, [page, totalPages]);
+    setPage(1);
+  }, [debouncedSearch]);
 
-  const loadSuppliers = useCallback(async (options?: { silent?: boolean }) => {
-    if (!options?.silent) {
-      setIsLoading(true);
-    }
-    setError(null);
+  // ---------------------------------------------------------------------------
+  // Core data loader — calls backend with search + page + limit
+  // ---------------------------------------------------------------------------
+  const loadSuppliers = useCallback(
+    async (options?: { silent?: boolean; overridePage?: number }) => {
+      const targetPage = options?.overridePage ?? page;
 
-    try {
-      const response = await getSuppliers();
-      if (!isMountedRef.current) return;
-      setSuppliers(response);
-    } catch (err: unknown) {
-      if (!isMountedRef.current) return;
-      if (err instanceof ApiClientError) {
-        setError({ code: err.code, message: err.message, status: err.status });
-        return;
+      if (!options?.silent) {
+        setIsLoading(true);
       }
-      setError({ message: "Unexpected error occurred.", status: 500 });
-    } finally {
-      if (!options?.silent && isMountedRef.current) {
-        setIsLoading(false);
-      }
-    }
-  }, []);
+      setError(null);
 
+      try {
+        const response = await getSuppliers({
+          search: debouncedSearch || undefined,
+          page: targetPage,
+          limit: PAGE_SIZE,
+        });
+
+        if (!isMountedRef.current) return;
+        setSuppliers(response.data);
+        setMeta(response.meta);
+      } catch (err: unknown) {
+        if (!isMountedRef.current) return;
+        if (err instanceof ApiClientError) {
+          setError({ code: err.code, message: err.message, status: err.status });
+          return;
+        }
+        setError({ message: "Unexpected error occurred.", status: 500 });
+      } finally {
+        if (!options?.silent && isMountedRef.current) {
+          setIsLoading(false);
+        }
+      }
+    },
+    [debouncedSearch, page],
+  );
+
+  // Fetch suppliers whenever debouncedSearch or page changes
   useEffect(() => {
     loadSuppliers();
   }, [loadSuppliers]);
 
+  // ---------------------------------------------------------------------------
+  // Toggle supplier active status
+  // ---------------------------------------------------------------------------
   async function handleToggle(supplier: Supplier) {
     const nextActive = !supplier.is_active;
 
     setSuppliers((prev) =>
-      prev.map((item) => (item.id === supplier.id ? { ...item, is_active: nextActive } : item))
+      prev.map((item) => (item.id === supplier.id ? { ...item, is_active: nextActive } : item)),
     );
     setUpdating((prev) => ({ ...prev, [supplier.id]: true }));
 
@@ -203,7 +232,9 @@ export default function SuppliersPage() {
       await toggleSupplier(supplier.id);
     } catch (err: unknown) {
       setSuppliers((prev) =>
-        prev.map((item) => (item.id === supplier.id ? { ...item, is_active: supplier.is_active } : item))
+        prev.map((item) =>
+          item.id === supplier.id ? { ...item, is_active: supplier.is_active } : item,
+        ),
       );
 
       if (err instanceof ApiClientError) {
@@ -220,6 +251,31 @@ export default function SuppliersPage() {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Export CSV
+  // ---------------------------------------------------------------------------
+  function handleExportCSV() {
+    setIsExporting(true);
+    try {
+      const url = getExportCSVUrl(debouncedSearch || undefined);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = "suppliers.csv";
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      toast.success("CSV export started.");
+    } catch {
+      toast.error("Failed to export CSV.");
+    } finally {
+      // Small delay so the button shows a brief loading indicator
+      setTimeout(() => setIsExporting(false), 800);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Form operations
+  // ---------------------------------------------------------------------------
   function openCreateForm() {
     setFormMode("create");
     setEditingSupplier(null);
@@ -300,11 +356,40 @@ export default function SuppliersPage() {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Pagination helpers
+  // ---------------------------------------------------------------------------
+  const totalPages = meta.total_pages;
+  const currentPage = meta.current_page;
+
+  /** Build an array of page numbers to render, with ellipsis markers (-1) */
+  function buildPageNumbers(): number[] {
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+
+    const pages: number[] = [1];
+
+    if (currentPage > 3) pages.push(-1); // left ellipsis
+
+    const start = Math.max(2, currentPage - 1);
+    const end = Math.min(totalPages - 1, currentPage + 1);
+    for (let i = start; i <= end; i++) pages.push(i);
+
+    if (currentPage < totalPages - 2) pages.push(-1); // right ellipsis
+
+    pages.push(totalPages);
+    return pages;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
   return (
     <main className="min-h-screen bg-[#FAFAFA] p-6 lg:p-8">
       <div className="mx-auto max-w-6xl space-y-6">
 
-        {/* Header Section (Section 3.1 app shell layout) */}
+        {/* Header Section */}
         <header className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-200 pb-5">
           <div>
             <h1 className="text-[28px] font-medium tracking-tight text-zinc-900 font-display">Supplier Management</h1>
@@ -312,21 +397,62 @@ export default function SuppliersPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Search Input */}
-            <div className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-1.8 focus-within:ring-2 focus-within:ring-blue-100 focus-within:border-blue-500 transition-all duration-150">
-              <svg viewBox="0 0 24 24" className="h-4 w-4 text-zinc-400" fill="none" stroke="currentColor" strokeWidth="2">
+            {/* Search Input with Debounce */}
+            <div className="relative flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 focus-within:ring-2 focus-within:ring-blue-100 focus-within:border-blue-500 transition-all duration-150">
+              <svg viewBox="0 0 24 24" className="h-4 w-4 text-zinc-400 shrink-0" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="11" cy="11" r="7" />
                 <path d="m20 20-3.5-3.5" />
               </svg>
               <input
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="Quick search..."
+                value={searchInput}
+                onChange={(event) => setSearchInput(event.target.value)}
+                placeholder="Search suppliers..."
                 className="w-40 bg-transparent text-sm text-zinc-700 outline-none placeholder:text-zinc-400 font-body font-medium"
               />
+              {/* Debounce indicator */}
+              {searchInput !== debouncedSearch && (
+                <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                  <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-600" />
+                </div>
+              )}
+              {/* Clear button */}
+              {searchInput && searchInput === debouncedSearch && (
+                <button
+                  type="button"
+                  onClick={() => setSearchInput("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition-colors"
+                  aria-label="Clear search"
+                >
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
             </div>
 
-            {/* Add Supplier Button (zinc-900 default button class) */}
+            {/* Export CSV Button */}
+            <Button
+              type="button"
+              onClick={handleExportCSV}
+              disabled={isExporting}
+              className="h-9 rounded-lg border border-zinc-200 bg-white px-3.5 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 shadow-sm transition-colors duration-150 font-body flex items-center gap-1.5"
+            >
+              {isExporting ? (
+                <>
+                  <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-600" />
+                  Exporting…
+                </>
+              ) : (
+                <>
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Export CSV
+                </>
+              )}
+            </Button>
+
+            {/* Add Supplier Button */}
             <Button type="button" onClick={openCreateForm} className="h-9 rounded-lg bg-zinc-900 hover:bg-zinc-700 text-white px-4 text-xs font-semibold shadow-sm transition-colors duration-150 font-body">
               + Add Supplier
             </Button>
@@ -359,7 +485,7 @@ export default function SuppliersPage() {
               </p>
             ) : null}
           </div>
-        ) : suppliers.length === 0 ? (
+        ) : meta.total_rows === 0 && !debouncedSearch ? (
           <div className="rounded-xl border border-zinc-200 border-dashed bg-white p-12 text-center shadow-sm max-w-xl mx-auto my-12">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-zinc-50 border border-zinc-200 text-zinc-450 mb-4">
               <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
@@ -381,262 +507,305 @@ export default function SuppliersPage() {
                 <div className="flex items-center gap-2">
                   <h2 className="text-base font-semibold text-zinc-900 font-body">Registered Suppliers</h2>
                   <span className="bg-zinc-100 text-zinc-650 text-xs font-semibold px-2 py-0.5 rounded-full">
-                    {filteredSuppliers.length}
+                    {meta.total_rows}
                   </span>
                 </div>
+                {debouncedSearch && (
+                  <span className="text-xs text-zinc-450 font-body font-medium">
+                    Filtered by &ldquo;<span className="text-zinc-700">{debouncedSearch}</span>&rdquo;
+                  </span>
+                )}
               </div>
 
-              {/* Desktop Table View */}
-              <div className="hidden md:block overflow-x-auto">
-                <table className="w-full text-sm text-left">
-                  <thead className="bg-zinc-50 border-b border-zinc-200 text-xs font-semibold text-zinc-500 uppercase tracking-wider">
-                    <tr>
-                      <th className="px-6 py-3.5 w-16 text-center font-body">#</th>
-                      <th className="px-6 py-3.5 font-body">Name & Description</th>
-                      <th className="px-6 py-3.5 w-32 font-body">Status</th>
-                      <th className="px-6 py-3.5 w-44 font-body">Mock Behavior</th>
-                      <th className="px-6 py-3.5 w-28 font-body">Timeout</th>
-                      <th className="px-6 py-3.5 w-36 font-body">Created</th>
-                      <th className="px-6 py-3.5 w-28 text-center font-body">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-100 font-medium">
-                    {pagedSuppliers.map((supplier, index) => {
+              {suppliers.length === 0 && debouncedSearch ? (
+                /* No results for search query */
+                <div className="px-6 py-12 text-center">
+                  <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-zinc-100 text-zinc-400 mb-3">
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                      <circle cx="11" cy="11" r="7" />
+                      <path d="m20 20-3.5-3.5" />
+                    </svg>
+                  </div>
+                  <p className="text-sm font-medium text-zinc-600 font-body">No suppliers match &ldquo;{debouncedSearch}&rdquo;</p>
+                  <p className="mt-1 text-xs text-zinc-400 font-body">Try adjusting your search query</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-4 h-8 rounded-lg border-zinc-200 bg-white font-body text-xs"
+                    onClick={() => setSearchInput("")}
+                  >
+                    Clear search
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  {/* Desktop Table View */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                      <thead className="bg-zinc-50 border-b border-zinc-200 text-xs font-semibold text-zinc-500 uppercase tracking-wider">
+                        <tr>
+                          <th className="px-6 py-3.5 w-16 text-center font-body">#</th>
+                          <th className="px-6 py-3.5 font-body">Name &amp; Description</th>
+                          <th className="px-6 py-3.5 w-32 font-body">Status</th>
+                          <th className="px-6 py-3.5 w-44 font-body">Mock Behavior</th>
+                          <th className="px-6 py-3.5 w-28 font-body">Timeout</th>
+                          <th className="px-6 py-3.5 w-36 font-body">Created</th>
+                          <th className="px-6 py-3.5 w-28 text-center font-body">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-100 font-medium">
+                        {suppliers.map((supplier) => {
+                          const isUpdating = !!updating[supplier.id];
+                          const behaviorLabel = behaviorLabels[supplier.mock_behavior] ?? supplier.mock_behavior;
+
+                          return (
+                            <tr key={supplier.id} className="hover:bg-zinc-50/70 transition-colors duration-100 text-zinc-800">
+                              <td className="px-6 py-4 text-center text-xs text-zinc-400 font-mono">
+                                {supplier.display_order}
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="flex flex-col">
+                                  <p className="text-sm font-semibold text-zinc-900 font-body">{supplier.name}</p>
+                                  {supplier.description ? (
+                                    <p className="mt-0.5 text-xs text-zinc-450 font-body leading-relaxed max-w-sm">
+                                      {supplier.description}
+                                    </p>
+                                  ) : null}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="flex items-center gap-2">
+                                  <Switch
+                                    checked={supplier.is_active}
+                                    onCheckedChange={() => handleToggle(supplier)}
+                                    loading={isUpdating}
+                                    checkedClass="bg-green-500 border-green-500"
+                                    aria-label={`Toggle ${supplier.name}`}
+                                  />
+                                  <span className={`text-xs font-semibold font-body ${supplier.is_active ? "text-green-600" : "text-zinc-400"}`}>
+                                    {supplier.is_active ? "Active" : "Inactive"}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4">
+                                {supplier.mock_behavior === "success" && (
+                                  <span className="inline-flex items-center gap-1 rounded-full border border-green-200 bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700">
+                                    Success
+                                  </span>
+                                )}
+                                {supplier.mock_behavior === "timeout" && (
+                                  <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">
+                                    Timeout
+                                  </span>
+                                )}
+                                {supplier.mock_behavior === "random_error" && (
+                                  <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2.5 py-0.5 text-xs font-medium text-red-700">
+                                    Random Error
+                                  </span>
+                                )}
+                                {supplier.mock_behavior !== "success" && supplier.mock_behavior !== "timeout" && supplier.mock_behavior !== "random_error" && (
+                                  <Badge variant="secondary" className="bg-zinc-100 text-zinc-600 text-xs border-zinc-200 font-medium">
+                                    {behaviorLabel}
+                                  </Badge>
+                                )}
+                              </td>
+                              <td className="px-6 py-4 text-xs font-mono text-zinc-600">
+                                {supplier.timeout_ms.toLocaleString("en-US")} ms
+                              </td>
+                              <td className="px-6 py-4 text-xs text-zinc-450">
+                                {formatDate(supplier.created_at)}
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="flex items-center justify-center gap-1.5">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 rounded-lg text-zinc-400 hover:text-zinc-800 hover:bg-zinc-100"
+                                    onClick={() => openEditForm(supplier)}
+                                    aria-label="Edit supplier"
+                                  >
+                                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                    </svg>
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 rounded-lg text-zinc-400 hover:text-red-650 hover:bg-red-50"
+                                    onClick={() => setDeleteTarget(supplier)}
+                                    aria-label="Delete supplier"
+                                  >
+                                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Mobile Card List View */}
+                  <div className="block md:hidden divide-y divide-zinc-150">
+                    {suppliers.map((supplier) => {
                       const isUpdating = !!updating[supplier.id];
                       const behaviorLabel = behaviorLabels[supplier.mock_behavior] ?? supplier.mock_behavior;
 
                       return (
-                        <tr key={supplier.id} className="hover:bg-zinc-50/70 transition-colors duration-100 text-zinc-800">
-                          <td className="px-6 py-4 text-center text-xs text-zinc-400 font-mono">
-                            {supplier.display_order}
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex flex-col">
+                        <div key={supplier.id} className="p-4 space-y-3 bg-white hover:bg-zinc-50/40">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
                               <p className="text-sm font-semibold text-zinc-900 font-body">{supplier.name}</p>
                               {supplier.description ? (
-                                <p className="mt-0.5 text-xs text-zinc-450 font-body leading-relaxed max-w-sm">
-                                  {supplier.description}
-                                </p>
+                                <p className="mt-0.5 text-xs text-zinc-450 font-body leading-relaxed">{supplier.description}</p>
                               ) : null}
                             </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-2">
-                              {/* Green switch toggle for supplier states */}
-                              <Switch
-                                checked={supplier.is_active}
-                                onCheckedChange={() => handleToggle(supplier)}
-                                loading={isUpdating}
-                                checkedClass="bg-green-500 border-green-500"
-                                aria-label={`Toggle ${supplier.name}`}
-                              />
-                              <span className={`text-xs font-semibold font-body ${supplier.is_active ? "text-green-600" : "text-zinc-400"}`}>
-                                {supplier.is_active ? "Active" : "Inactive"}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
+
                             {supplier.mock_behavior === "success" && (
-                              <span className="inline-flex items-center gap-1 rounded-full border border-green-200 bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700">
+                              <span className="inline-flex items-center gap-1 rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-[10px] font-semibold text-green-700">
                                 Success
                               </span>
                             )}
                             {supplier.mock_behavior === "timeout" && (
-                              <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">
+                              <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
                                 Timeout
                               </span>
                             )}
                             {supplier.mock_behavior === "random_error" && (
-                              <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2.5 py-0.5 text-xs font-medium text-red-700">
-                                Random Error
+                              <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-700">
+                                Error
                               </span>
                             )}
                             {supplier.mock_behavior !== "success" && supplier.mock_behavior !== "timeout" && supplier.mock_behavior !== "random_error" && (
-                              <Badge variant="secondary" className="bg-zinc-100 text-zinc-600 text-xs border-zinc-200 font-medium">
+                              <Badge variant="secondary" className="bg-zinc-100 text-zinc-650 text-[10px] border-zinc-200 font-medium">
                                 {behaviorLabel}
                               </Badge>
                             )}
-                          </td>
-                          <td className="px-6 py-4 text-xs font-mono text-zinc-600">
-                            {supplier.timeout_ms.toLocaleString("en-US")} ms
-                          </td>
-                          <td className="px-6 py-4 text-xs text-zinc-450">
-                            {formatDate(supplier.created_at)}
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center justify-center gap-1.5">
-                              {/* Edit Button - ghost variant with pencil icon */}
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 rounded-lg text-zinc-400 hover:text-zinc-800 hover:bg-zinc-100"
-                                onClick={() => openEditForm(supplier)}
-                                aria-label="Edit supplier"
-                              >
-                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                                </svg>
-                              </Button>
-                              {/* Delete Button - ghost variant with trash icon */}
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 rounded-lg text-zinc-400 hover:text-red-650 hover:bg-red-50"
-                                onClick={() => setDeleteTarget(supplier)}
-                                aria-label="Delete supplier"
-                              >
-                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
-                              </Button>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 text-xs font-body text-zinc-500 pt-1">
+                            <div>
+                              <span className="text-zinc-400">Timeout: </span>
+                              <span className="font-semibold font-mono text-zinc-700">{supplier.timeout_ms} ms</span>
                             </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                            <div>
+                              <span className="text-zinc-400">Order: </span>
+                              <span className="font-semibold font-mono text-zinc-700">{supplier.display_order}</span>
+                            </div>
+                            <div className="col-span-2 flex items-center justify-between border-t border-zinc-100 pt-2 mt-1">
+                              <div className="flex items-center gap-2">
+                                <Switch
+                                  checked={supplier.is_active}
+                                  onCheckedChange={() => handleToggle(supplier)}
+                                  loading={isUpdating}
+                                  checkedClass="bg-green-500 border-green-500"
+                                  aria-label={`Toggle ${supplier.name}`}
+                                />
+                                <span className={`text-[11px] font-semibold ${supplier.is_active ? "text-green-600" : "text-zinc-400"}`}>
+                                  {supplier.is_active ? "Active" : "Inactive"}
+                                </span>
+                              </div>
 
-              {/* Mobile Card List View */}
-              <div className="block md:hidden divide-y divide-zinc-150">
-                {pagedSuppliers.map((supplier) => {
-                  const isUpdating = !!updating[supplier.id];
-                  const behaviorLabel = behaviorLabels[supplier.mock_behavior] ?? supplier.mock_behavior;
-
-                  return (
-                    <div key={supplier.id} className="p-4 space-y-3 bg-white hover:bg-zinc-50/40">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-semibold text-zinc-900 font-body">{supplier.name}</p>
-                          {supplier.description ? (
-                            <p className="mt-0.5 text-xs text-zinc-450 font-body leading-relaxed">{supplier.description}</p>
-                          ) : null}
-                        </div>
-
-                        {supplier.mock_behavior === "success" && (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-[10px] font-semibold text-green-700">
-                            Success
-                          </span>
-                        )}
-                        {supplier.mock_behavior === "timeout" && (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
-                            Timeout
-                          </span>
-                        )}
-                        {supplier.mock_behavior === "random_error" && (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-700">
-                            Error
-                          </span>
-                        )}
-                        {supplier.mock_behavior !== "success" && supplier.mock_behavior !== "timeout" && supplier.mock_behavior !== "random_error" && (
-                          <Badge variant="secondary" className="bg-zinc-100 text-zinc-650 text-[10px] border-zinc-200 font-medium">
-                            {behaviorLabel}
-                          </Badge>
-                        )}
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2 text-xs font-body text-zinc-500 pt-1">
-                        <div>
-                          <span className="text-zinc-400">Timeout: </span>
-                          <span className="font-semibold font-mono text-zinc-700">{supplier.timeout_ms} ms</span>
-                        </div>
-                        <div>
-                          <span className="text-zinc-400">Order: </span>
-                          <span className="font-semibold font-mono text-zinc-700">{supplier.display_order}</span>
-                        </div>
-                        <div className="col-span-2 flex items-center justify-between border-t border-zinc-100 pt-2 mt-1">
-                          <div className="flex items-center gap-2">
-                            <Switch
-                              checked={supplier.is_active}
-                              onCheckedChange={() => handleToggle(supplier)}
-                              loading={isUpdating}
-                              checkedClass="bg-green-500 border-green-500"
-                              aria-label={`Toggle ${supplier.name}`}
-                            />
-                            <span className={`text-[11px] font-semibold ${supplier.is_active ? "text-green-600" : "text-zinc-400"}`}>
-                              {supplier.is_active ? "Active" : "Inactive"}
-                            </span>
-                          </div>
-
-                          <div className="flex gap-2">
-                            <Button type="button" variant="outline" size="sm" className="h-8 rounded-lg border-zinc-200 bg-white" onClick={() => openEditForm(supplier)}>
-                              Edit
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 rounded-lg text-red-650 hover:bg-red-50"
-                              onClick={() => setDeleteTarget(supplier)}
-                            >
-                              Delete
-                            </Button>
+                              <div className="flex gap-2">
+                                <Button type="button" variant="outline" size="sm" className="h-8 rounded-lg border-zinc-200 bg-white" onClick={() => openEditForm(supplier)}>
+                                  Edit
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 rounded-lg text-red-650 hover:bg-red-50"
+                                  onClick={() => setDeleteTarget(supplier)}
+                                >
+                                  Delete
+                                </Button>
+                              </div>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Table Footer with Pagination Controls */}
-              <div className="px-5 py-4 border-t border-zinc-100 flex flex-wrap items-center justify-between gap-3 text-sm text-zinc-500">
-                <span className="font-body text-xs font-medium">
-                  Showing {pagedSuppliers.length} of {filteredSuppliers.length} suppliers
-                </span>
-                <div className="flex items-center gap-1.5">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-8 rounded-lg border-zinc-200 bg-white font-body text-xs"
-                    onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-                    disabled={page === 1}
-                  >
-                    Previous
-                  </Button>
-
-                  {/* Page numbers (Section 5.8 active page: bg-zinc-900) */}
-                  <div className="flex gap-1">
-                    {Array.from({ length: totalPages }).map((_, idx) => {
-                      const p = idx + 1;
-                      const isCurrent = p === page;
-                      return (
-                        <button
-                          key={p}
-                          onClick={() => setPage(p)}
-                          className={`h-8 w-8 rounded-lg text-xs font-semibold transition-all duration-150 ${isCurrent
-                            ? "bg-zinc-900 text-white shadow-sm"
-                            : "border border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50"
-                            }`}
-                        >
-                          {p}
-                        </button>
                       );
                     })}
                   </div>
 
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-8 rounded-lg border-zinc-200 bg-white font-body text-xs"
-                    onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-                    disabled={page === totalPages}
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
+                  {/* ======================================================= */}
+                  {/* Dynamic Pagination Controls                              */}
+                  {/* ======================================================= */}
+                  <div className="px-5 py-4 border-t border-zinc-100 flex flex-wrap items-center justify-between gap-3 text-sm text-zinc-500">
+                    <span className="font-body text-xs font-medium">
+                      Showing {suppliers.length} of {meta.total_rows} suppliers
+                      {debouncedSearch ? ` matching "${debouncedSearch}"` : ""}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {/* Previous Button */}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 rounded-lg border-zinc-200 bg-white font-body text-xs"
+                        onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                        disabled={currentPage <= 1}
+                      >
+                        Previous
+                      </Button>
+
+                      {/* Page Numbers with ellipsis */}
+                      <div className="flex gap-1">
+                        {buildPageNumbers().map((p, idx) => {
+                          if (p === -1) {
+                            return (
+                              <span
+                                key={`ellipsis-${idx}`}
+                                className="flex h-8 w-8 items-center justify-center text-xs text-zinc-400 font-body select-none"
+                              >
+                                …
+                              </span>
+                            );
+                          }
+
+                          const isCurrent = p === currentPage;
+                          return (
+                            <button
+                              key={p}
+                              onClick={() => setPage(p)}
+                              className={`h-8 w-8 rounded-lg text-xs font-semibold transition-all duration-150 ${
+                                isCurrent
+                                  ? "bg-zinc-900 text-white shadow-sm"
+                                  : "border border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-50"
+                              }`}
+                            >
+                              {p}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Next Button */}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 rounded-lg border-zinc-200 bg-white font-body text-xs"
+                        onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+                        disabled={currentPage >= totalPages}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              )}
             </section>
           </>
         )}
       </div>
 
-      {/* Add/Edit Dialog Popover (Section 5.dialog specs) */}
+      {/* Add/Edit Dialog Popover */}
       {isFormOpen ? (() => {
         const timeoutVal = formState.timeout_ms;
         let timeoutLabel = "Standard Timeout";
@@ -766,7 +935,7 @@ export default function SuppliersPage() {
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2">
-                  {/* Authentication select (Section 5.5 option api key disabled) */}
+                  {/* Authentication select */}
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-zinc-700 font-body">
                       Authentication
@@ -879,7 +1048,7 @@ export default function SuppliersPage() {
         );
       })() : null}
 
-      {/* Delete confirmation dialog (Section 5.7 AlertDialog specs) */}
+      {/* Delete confirmation dialog */}
       {deleteTarget ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4 py-6 transition-all duration-300 animate-in fade-in">
           <div className="relative w-full max-w-[400px] rounded-2xl border border-zinc-200 bg-white p-6 shadow-[0_4px_6px_rgba(0,0,0,0.05),0_10px_15px_rgba(0,0,0,0.08)] animate-in zoom-in-95 duration-200">

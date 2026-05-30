@@ -2,7 +2,6 @@ import type {
   CreateSupplierResponse,
   ErrorResponse,
   StockResponse,
-  Supplier,
   SupplierPayload,
   SupplierListResponse,
 } from "@/types";
@@ -95,24 +94,34 @@ export function getStock(): Promise<StockResponse> {
   return request<StockResponse>("/stock", { method: "GET" });
 }
 
-function unwrapSupplierList(payload: unknown): Supplier[] {
-  if (Array.isArray(payload)) {
-    return payload as Supplier[];
-  }
+export async function getSuppliers(params?: {
+  search?: string;
+  page?: number;
+  limit?: number;
+}): Promise<SupplierListResponse> {
+  const query = new URLSearchParams();
+  if (params?.search) query.set("search", params.search);
+  if (params?.page) query.set("page", String(params.page));
+  if (params?.limit) query.set("limit", String(params.limit));
 
-  if (payload && typeof payload === "object") {
-    const maybeData = (payload as SupplierListResponse).data;
-    if (Array.isArray(maybeData)) {
-      return maybeData as Supplier[];
-    }
-  }
+  const qs = query.toString();
+  const path = qs ? `/suppliers?${qs}` : "/suppliers";
 
-  return [];
+  const payload = await request<SupplierListResponse>(path, { method: "GET" });
+
+  return {
+    data: Array.isArray(payload.data) ? payload.data : [],
+    meta: payload.meta ?? { current_page: 1, limit: 20, total_rows: 0, total_pages: 1 },
+  };
 }
 
-export async function getSuppliers(): Promise<Supplier[]> {
-  const payload = await request<unknown>("/suppliers", { method: "GET" });
-  return unwrapSupplierList(payload);
+export function getExportCSVUrl(search?: string): string {
+  const base = `${API_BASE_URL}/suppliers/export`;
+  if (search?.trim()) {
+    const query = new URLSearchParams({ search: search.trim() });
+    return `${base}?${query.toString()}`;
+  }
+  return base;
 }
 
 export function createSupplier(payload: SupplierPayload): Promise<CreateSupplierResponse> {

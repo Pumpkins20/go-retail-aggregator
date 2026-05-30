@@ -48,14 +48,14 @@ export interface CreateSupplierResponse {
   message: string;
 }
 
-export interface Pagination {
-  page: number;
+export interface PaginationMeta {
+  current_page: number;
   limit: number;
-  total: number;
+  total_rows: number;
   total_pages: number;
 }
 
 export interface SupplierListResponse {
   data: Supplier[];
-  pagination?: Pagination;
+  meta: PaginationMeta;
 }
