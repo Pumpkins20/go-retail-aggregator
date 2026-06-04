@@ -47,13 +47,14 @@ func main() {
 	// initialize dependencies
 	// initialize repositories
 	supplierRepo := repository.NewSupplierRepository(pool)
+	stockRepo := repository.NewStockRepository(pool)
 
 	// initialize engines and fetchers
 	fetcherFactory := fetcher.NewFetcherFactory(cfg.FetcherMode)
 	stockEngine := engine.NewStockEngine(fetcherFactory)
 
 	//initialize worker
-	syncWorker := worker.NewSyncWorker(rmqBroker, supplierRepo, stockEngine)
+	syncWorker := worker.NewSyncWorker(rmqBroker, supplierRepo, stockRepo, stockEngine)
 	syncWorker.Start()
 
 	// initialize services
