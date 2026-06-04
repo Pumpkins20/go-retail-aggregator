@@ -8,23 +8,25 @@ import (
 )
 
 type AppConfig struct {
-	Port        string
-	DatabaseURL string
+	Port           string
+	DatabaseURL    string
 	AllowedOrigins string
-	FetcherMode  string
+	FetcherMode    string
+	RabbitMQURL    string
 }
 
 func LoadConfig() *AppConfig {
-	err :=godotenv.Load()
-	if err != nil{
+	err := godotenv.Load()
+	if err != nil {
 		log.Printf("Error loading .env file: %v", err)
 	}
 
 	config := &AppConfig{
-		Port:        os.Getenv("PORT"),
-		DatabaseURL: os.Getenv("DATABASE_URL"),
+		Port:           os.Getenv("PORT"),
+		DatabaseURL:    os.Getenv("DATABASE_URL"),
 		AllowedOrigins: os.Getenv("ALLOWED_ORIGINS"),
-		FetcherMode:  os.Getenv("FETCHER_MODE"),
+		FetcherMode:    os.Getenv("FETCHER_MODE"),
+		RabbitMQURL:    os.Getenv("RABBITMQ_URL"),
 	}
 	return config
 }

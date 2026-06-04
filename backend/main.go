@@ -1,6 +1,7 @@
 package main
 
 import (
+	"backend/internal/broker"
 	"backend/internal/config"
 	"backend/internal/db"
 	"backend/internal/engine"
@@ -9,6 +10,7 @@ import (
 	"backend/internal/middleware"
 	"backend/internal/repository"
 	"backend/internal/services"
+	"backend/internal/worker"
 
 	"context"
 	"fmt"
@@ -33,6 +35,15 @@ func main() {
 	}
 	defer pool.Close()
 
+	if cfg.RabbitMQURL == "" {
+		cfg.RabbitMQURL = "amqp://guest:guest@localhost:5672/"
+	}
+	rmqBroker, err := broker.NewRabbitMQBroker(cfg.RabbitMQURL)
+	if err != nil {
+		log.Fatalf("Failed to connect to RabbitMQ: %v", err)
+	}
+	defer rmqBroker.Close()
+
 	// initialize dependencies
 	// initialize repositories
 	supplierRepo := repository.NewSupplierRepository(pool)
@@ -41,6 +52,10 @@ func main() {
 	fetcherFactory := fetcher.NewFetcherFactory(cfg.FetcherMode)
 	stockEngine := engine.NewStockEngine(fetcherFactory)
 
+	//initialize worker
+	syncWorker := worker.NewSyncWorker(rmqBroker, supplierRepo, stockEngine)
+	syncWorker.Start()
+
 	// initialize services
 	supplierService := services.NewSupplierService(supplierRepo)
 	stockService := services.NewStockService(supplierRepo, stockEngine)
@@ -48,6 +63,31 @@ func main() {
 	// initialize handlers
 	supplierHandler := handlers.NewSupplierHandler(supplierService)
 	stockHandler := handlers.NewStockHandler(stockService)
+
+	go func() {
+		log.Println("Starting RabbitMQ Worker...")
+		ticker := time.NewTicker(1 * time.Minute)
+		defer ticker.Stop()
+
+		for range ticker.C {
+			log.Println("Syncing")
+
+			// get all supplier with active status
+			activeSupplier, err := supplierRepo.GetActiveSuppliers(context.Background())
+			if err != nil {
+				log.Println("Error getting active suppliers")
+				continue
+			}
+
+			// throw task to rabbitmq
+			for _, supplier := range activeSupplier {
+				err := rmqBroker.PublishSyncTask(context.Background(), supplier.ID.String())
+				if err != nil {
+					log.Printf("Failed to publish task for supplier %s: %v", supplier.Name, err)
+				}
+			}
+		}
+	}()
 
 	// setup HTTP server and routes
 	mux := http.NewServeMux()

@@ -17,6 +17,14 @@ func NewStockEngine(factory *fetcher.FetcherFactory) *StockEngine {
 	}
 }
 
+func (e *StockEngine) Sync(ctx context.Context, supplier models.Supplier) models.FetchResult {
+	tCtx, cancel := context.WithTimeout(ctx, time.Duration(supplier.TimeoutMs)*time.Millisecond)
+	defer cancel()
+
+	f := e.fetcherFactory.GetFetcher()
+	return f.Fetch(tCtx, supplier)
+}
+
 func (e *StockEngine) FanOut(ctx context.Context, suppliers []models.Supplier) []models.FetchResult {
 
 	if len(suppliers) == 0 {
