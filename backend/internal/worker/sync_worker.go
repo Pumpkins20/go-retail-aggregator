@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"log"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type SyncWorker struct {
@@ -37,6 +39,8 @@ func (w *SyncWorker) Start() {
 		for d := range msgs {
 			log.Println("-------------------------------------")
 			log.Printf("Receiving a task : %s", d.Body)
+			traceID := uuid.New().String()
+			startedAt := time.Now()
 
 			// translate JSON task
 			var payload broker.TaskPayload
@@ -63,15 +67,9 @@ func (w *SyncWorker) Start() {
 			log.Printf("Result for %s -> Status: %s, Stock: %d, Latency: %v ms", result.SupplierName, result.Status, result.Stock, result.LatencyMs)
 
 			// save log into database
-			errLog := w.stockRepo.InsertSyncLog(context.Background(), supplier.ID.String(), result.Status, result.ErrorMessage, int(result.LatencyMs))
+			errLog := w.stockRepo.InsertSyncLog(context.Background(), supplier.ID.String(), traceID, result.Status, result.Stock, result.ErrorMessage, startedAt)
 			if errLog != nil {
 				log.Printf("Failed to save sync log for %s: %v", supplier.Name, errLog)
-			}
-			if result.Status == "SUCCESS" {
-				errStock := w.stockRepo.UpsertStock(context.Background(), supplier.ID.String(), result.Stock)
-				if errStock != nil {
-					log.Printf("Failed to upsert stock for %s: %v", supplier.Name, errStock)
-				}
 			}
 			d.Ack(false)
 			log.Printf("Task Completed and Acknowledged")
