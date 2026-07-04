@@ -22,13 +22,21 @@ type Supplier struct {
 	DeletedAt    *time.Time `json:"deleted_at,omitempty"`
 }
 
+type FetchProduct struct {
+	SKU   string  `json:"sku"`
+	Name  string  `json:"name"`
+	Price float64 `json:"price"`
+	Stock int     `json:"stock"`
+}
+
 type FetchResult struct {
-	SupplierID   uuid.UUID `json:"supplier_id"`
-	SupplierName string    `json:"supplier_name"`
-	Description  *string   `json:"description"`
-	Stock        int       `json:"stock"`
-	Status       string    `json:"status"`
-	LatencyMs    int64     `json:"latency_ms"`
-	FetchedAt    time.Time `json:"fetched_at"`
-	ErrorMessage *string   `json:"error_message"`
+	SupplierID   uuid.UUID      `json:"supplier_id"`
+	SupplierName string         `json:"supplier_name"`
+	Description  *string        `json:"description"`
+	Stock        int            `json:"stock"`
+	Status       string         `json:"status"`
+	Products     []FetchProduct `json:"products"`
+	LatencyMs    int64          `json:"latency_ms"`
+	FetchedAt    time.Time      `json:"fetched_at"`
+	ErrorMessage *string        `json:"error_message"`
 }

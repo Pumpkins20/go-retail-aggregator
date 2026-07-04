@@ -17,7 +17,10 @@ type HttpFetcher struct {
 
 type DummyJsonResponse struct {
 	Products []struct {
-		Stock int `json:"stock"`
+		SKU   string  `json:"sku"`
+		Name  string  `json:"name"`
+		Price float64 `json:"price"`
+		Stock int     `json:"stock"`
 	} `json:"products"`
 }
 
